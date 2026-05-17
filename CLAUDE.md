@@ -6,7 +6,7 @@
 
 ## Visão Geral
 
-Sistema web para escritório de despachante imobiliário. 4 usuários internos, acesso remoto, nível production-grade com arquitetura preparada para IA futura.
+Sistema web para escritório de advocacia imobiliária (Beza, Miranda e Bonetti) com empresa parceira despachante. 4 usuários internos + perfil `despachante-externo` (empresa com CNPJ distinto — acesso isolado). Acesso remoto, nível production-grade, arquitetura preparada para IA futura (Claude API).
 
 **Diretório raiz:** `/Users/ramonbeza/crm-beza/`
 
@@ -251,11 +251,45 @@ alembic history --verbose
 | Sprint | Status | Descrição |
 |---|---|---|
 | **Sprint 1** | ✅ Concluído | Docker + FastAPI + PostgreSQL + Redis + Nginx + Auth JWT+RBAC + CRUD Clientes |
-| **Sprint 2** | ✅ Concluído | Agenda/Calendário (FullCalendar) + Atendimentos (modelos Meeting/Attendance, /meetings, /attendances, from-meeting, pending-procedures) |
-| **Sprint 3** | ⏳ Próximo | Procedimentos + 8 Etapas + Protocolo sequencial |
-| **Sprint 4** | ⏳ | Orçamentos + Templates + Geração de documentos |
-| **Sprint 5** | ⏳ | Dashboard + Alertas WebSocket + Busca global |
-| **Sprint 6** | ⏳ | IA: Redis Streams + Celery + Claude API |
+| **Sprint 2** | ✅ Concluído | Agenda/Calendário (FullCalendar) + Atendimentos (Meeting/Attendance, pipeline básico) |
+| **Sprint 3** | ✅ Concluído | Procedimentos + 8 Etapas padrão + Protocolo BMB-YYYY-0001 + ProcedureDetailPage |
+| **Sprint 4** | ⏳ Próximo | Imóveis (Módulo 3) + Checklist de documentos (Módulo 7) por tipo de procedimento |
+| **Sprint 5** | ⏳ | Orçamentos BMB-ORC-YYYY-0001 + Contratos de honorários + D4Sign (assinatura digital) |
+| **Sprint 6** | ⏳ | Gestão financeira: honorários, custas, repasse ao despachante externo |
+| **Sprint 7** | ⏳ | Comunicações: WhatsApp Business (Z-API/Evolution) + e-mail SMTP + notificações internas |
+| **Sprint 8** | ⏳ | Dashboard + relatórios + exportação PDF/Excel + gestão de prazos |
+| **Sprint 9** | ⏳ | Integrações: Google Calendar OAuth2 + ViaCEP + BrasilAPI (CNPJ lookup) |
+| **Sprint 10** | ⏳ | IA: Redis Streams + Celery + Claude API — geração automática de documentos |
+
+---
+
+## Briefing Expandido — Módulos identificados (Briefing_CRM_BMB_Expandido.docx)
+
+### Perfis de usuário (atualização futura)
+- `admin` → Acesso total
+- `advogado` → Sem configurações do sistema; sem exclusão sem aprovação
+- `assistente` (era `estagiario`) → Agenda, clientes, atendimentos, comunicações; SEM financeiro nem movimentação de etapas
+- `despachante-externo` ⚠️ NOVO → Vê **apenas** procedimentos onde está atribuído como executor. SEM: financeiro, outros procedimentos, dados de outros clientes, comunicações do escritório
+
+### Módulos por sprint futuro
+- **Módulo 3 — Imóveis**: matrícula, INCRA, inscrição imobiliária, tipo (urbano/rural), confrontantes, proprietários, N procedimentos por imóvel
+- **Módulo 7 — Checklists**: pré-configurado por tipo de procedimento; status por documento (pendente/recebido/aprovado); bloqueio de avançar etapas sem checklist completo
+- **Módulo 5 — Orçamentos**: formato BMB-ORC-YYYY-0001; versionamento; validade; separação honorários escritório / despachante / custas; D4Sign para assinatura digital
+- **Módulo 8 — Financeiro**: modelos fixo/parcelado/êxito/fixo+êxito; controle de parcelas; custas orçadas vs. realizadas; repasse ao despachante (contas a pagar)
+- **Módulo 9 — Comunicações**: WhatsApp Business API (Z-API ou Evolution API); SMTP próprio; templates com variáveis dinâmicas; sino de notificações
+- **Módulo 10 — Relatórios**: faturamento, inadimplência, taxa de conversão, tempo médio por etapa; exportação PDF/XLSX
+
+### Identificadores padronizados
+- Procedimento: `BMB-2025-0001` (sigla + ano + 4 dígitos) ← **já implementado no frontend**
+- Orçamento: `BMB-ORC-2025-0001`
+- Contrato: `BMB-CTR-2025-0001`
+- Nota de repasse: `BMB-REP-2025-0001`
+- Recibo: `BMB-REC-2025-0001`
+
+### Integrações confirmadas como prioritárias
+1. **WhatsApp Business API** (Z-API ou Evolution API) — com fallback e-mail
+2. **D4Sign** (assinatura digital ICP-Brasil) — com fallback upload manual PDF
+3. **Google Calendar** (OAuth 2.0 por usuário) — despachante-externo NÃO sincroniza
 
 ---
 
