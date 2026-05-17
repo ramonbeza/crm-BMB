@@ -78,3 +78,54 @@ export interface PaginatedClients {
   page_size: number;
   pages: number;
 }
+
+// ── Sprint 2: Agenda & Atendimentos ──────────────────────────────────────────
+
+export type ReceptionType = "presencial" | "email" | "whatsapp";
+export type MeetingStatus = "agendada" | "realizada" | "cancelada";
+
+export interface Meeting {
+  id: string;
+  client_id: string;
+  user_id: string | null;
+  scheduled_at: string;
+  reception_type: ReceptionType;
+  subject: string;
+  summary: string | null;
+  status: MeetingStatus;
+  created_at: string;
+  updated_at: string;
+  client_name: string | null;
+  user_name: string | null;
+}
+
+export interface PaginatedMeetings {
+  items: Meeting[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface Attendance {
+  id: string;
+  meeting_id: string | null;
+  client_id: string;
+  user_id: string | null;
+  decisions: string | null;
+  pending_items: string | null;
+  converted_to_procedure: boolean;
+  created_at: string;
+  updated_at: string;
+  client_name: string | null;
+  user_name: string | null;
+  meeting_subject: string | null;
+}
+
+export interface PaginatedAttendances {
+  items: Attendance[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}

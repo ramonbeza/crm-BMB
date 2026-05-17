@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Users, LayoutDashboard, LogOut, UserCircle2 } from "lucide-react";
+import { Users, LayoutDashboard, LogOut, UserCircle2, Calendar, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
@@ -7,6 +7,8 @@ import { api } from "@/lib/api";
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/clientes", label: "Clientes", icon: Users },
+  { to: "/agenda", label: "Agenda", icon: Calendar },
+  { to: "/atendimentos", label: "Atendimentos", icon: ClipboardList },
 ];
 
 export function Sidebar() {

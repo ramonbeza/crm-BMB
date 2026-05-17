@@ -13,3 +13,4 @@ frontend/dist/
 nginx/certs/
 *.log
 .DS_Store
+.claude/settings.local.json
