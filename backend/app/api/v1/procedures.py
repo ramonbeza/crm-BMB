@@ -1,0 +1,127 @@
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.deps import CurrentUser, get_session
+from app.crud.attendance import crud_attendance
+from app.crud.procedure import crud_procedure
+from app.models.procedure import PROCEDURE_TYPE_LABELS
+from app.models.user import UserRole
+from app.schemas.procedure import (
+    PaginatedProcedures,
+    ProcedureCreate,
+    ProcedureFromAttendance,
+    ProcedureRead,
+    ProcedureTypeOption,
+    ProcedureUpdate,
+    StageRead,
+    StageUpdate,
+)
+
+router = APIRouter()
+
+
+@router.get("/types", response_model=list[ProcedureTypeOption])
+async def list_procedure_types(_: CurrentUser):
+    return [ProcedureTypeOption(value=k, label=v) for k, v in PROCEDURE_TYPE_LABELS.items()]
+
+
+@router.get("/", response_model=PaginatedProcedures)
+async def list_procedures(
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    procedure_type: str | None = Query(None),
+    status_filter: str | None = Query(None, alias="status"),
+    client_id: UUID | None = Query(None),
+    responsible_user_id: UUID | None = Query(None),
+    tag: str | None = Query(None),
+):
+    return await crud_procedure.list_paginated(
+        db, page=page, page_size=page_size,
+        procedure_type=procedure_type, status=status_filter,
+        client_id=client_id, responsible_user_id=responsible_user_id, tag=tag,
+    )
+
+
+@router.post("/", response_model=ProcedureRead, status_code=status.HTTP_201_CREATED)
+async def create_procedure(
+    body: ProcedureCreate,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    return await crud_procedure.create_procedure(db, obj_in=body, created_by_id=current_user.id)
+
+
+@router.post("/from-attendance", response_model=ProcedureRead, status_code=status.HTTP_201_CREATED)
+async def create_procedure_from_attendance(
+    body: ProcedureFromAttendance,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    attendance = await crud_attendance.get_full(db, body.attendance_id)
+    if not attendance:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Atendimento não encontrado")
+    return await crud_procedure.create_from_attendance(
+        db, obj_in=body, attendance=attendance, created_by_id=current_user.id
+    )
+
+
+@router.get("/{procedure_id}", response_model=ProcedureRead)
+async def get_procedure(
+    procedure_id: UUID,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    p = await crud_procedure.get_full(db, procedure_id)
+    if not p:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedimento não encontrado")
+    return crud_procedure._to_read(p)
+
+
+@router.put("/{procedure_id}", response_model=ProcedureRead)
+async def update_procedure(
+    procedure_id: UUID,
+    body: ProcedureUpdate,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    p = await crud_procedure.get_full(db, procedure_id)
+    if not p:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedimento não encontrado")
+    return await crud_procedure.update_procedure(db, db_obj=p, obj_in=body)
+
+
+@router.put("/{procedure_id}/stages/{stage_id}", response_model=StageRead)
+async def update_stage(
+    procedure_id: UUID,
+    stage_id: UUID,
+    body: StageUpdate,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    stage = await crud_procedure.get_stage(db, stage_id)
+    if not stage or stage.procedure_id != procedure_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etapa não encontrada")
+    return await crud_procedure.update_stage(db, stage=stage, obj_in=body)
+
+
+@router.delete("/{procedure_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_procedure(
+    procedure_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    if current_user.role not in (UserRole.admin, UserRole.advogado):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas admin ou advogado podem excluir procedimentos",
+        )
+    p = await crud_procedure.get_full(db, procedure_id)
+    if not p:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedimento não encontrado")
+    await db.delete(p)
+    await db.flush()

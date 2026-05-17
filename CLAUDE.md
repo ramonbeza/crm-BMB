@@ -251,8 +251,8 @@ alembic history --verbose
 | Sprint | Status | Descrição |
 |---|---|---|
 | **Sprint 1** | ✅ Concluído | Docker + FastAPI + PostgreSQL + Redis + Nginx + Auth JWT+RBAC + CRUD Clientes |
-| **Sprint 2** | ⏳ Próximo | Agenda/Calendário (FullCalendar) + Atendimentos |
-| **Sprint 3** | ⏳ | Procedimentos + 8 Etapas + Protocolo sequencial |
+| **Sprint 2** | ✅ Concluído | Agenda/Calendário (FullCalendar) + Atendimentos (modelos Meeting/Attendance, /meetings, /attendances, from-meeting, pending-procedures) |
+| **Sprint 3** | ⏳ Próximo | Procedimentos + 8 Etapas + Protocolo sequencial |
 | **Sprint 4** | ⏳ | Orçamentos + Templates + Geração de documentos |
 | **Sprint 5** | ⏳ | Dashboard + Alertas WebSocket + Busca global |
 | **Sprint 6** | ⏳ | IA: Redis Streams + Celery + Claude API |

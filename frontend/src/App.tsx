@@ -8,6 +8,8 @@ import { ClientsPage } from "@/pages/ClientsPage";
 import { ClientFormPage } from "@/pages/ClientFormPage";
 import { MeetingsPage } from "@/pages/MeetingsPage";
 import { AttendancesPage } from "@/pages/AttendancesPage";
+import { ProceduresPage } from "@/pages/ProceduresPage";
+import { ProcedureDetailPage } from "@/pages/ProcedureDetailPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +31,8 @@ export default function App() {
               <Route path="/clientes/:id" element={<ClientFormPage />} />
               <Route path="/agenda" element={<MeetingsPage />} />
               <Route path="/atendimentos" element={<AttendancesPage />} />
+              <Route path="/procedimentos" element={<ProceduresPage />} />
+              <Route path="/procedimentos/:id" element={<ProcedureDetailPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

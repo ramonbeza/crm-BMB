@@ -129,3 +129,74 @@ export interface PaginatedAttendances {
   page_size: number;
   pages: number;
 }
+
+// ── Sprint 3: Procedimentos + Etapas + Protocolo ─────────────────────────────
+
+export type ProcedureStatus = "em_andamento" | "concluido" | "cancelado";
+export type StageStatus = "pendente" | "em_andamento" | "concluida";
+
+export interface ProcedureTypeOption {
+  value: string;
+  label: string;
+}
+
+export interface Stage {
+  id: string;
+  procedure_id: string;
+  order: number;
+  name: string;
+  status: StageStatus;
+  assigned_user_id: string | null;
+  assigned_user_name: string | null;
+  due_date: string | null;
+  completed_at: string | null;
+  notes: string | null;
+}
+
+export interface Procedure {
+  id: string;
+  protocol_number: number;
+  client_id: string;
+  procedure_type: string;
+  procedure_type_label: string | null;
+  opened_at: string;
+  description: string | null;
+  property_description: string | null;
+  matricula: string | null;
+  incra: string | null;
+  inscricao_imobiliaria: string | null;
+  requerente: string | null;
+  deadline: string | null;
+  tags: string[];
+  status: ProcedureStatus;
+  responsible_user_id: string | null;
+  responsible_name: string | null;
+  attendance_id: string | null;
+  created_at: string;
+  updated_at: string;
+  client_name: string | null;
+  stages: Stage[];
+}
+
+export interface ProcedureListItem {
+  id: string;
+  protocol_number: number;
+  client_name: string | null;
+  procedure_type: string;
+  procedure_type_label: string;
+  status: ProcedureStatus;
+  opened_at: string;
+  deadline: string | null;
+  tags: string[];
+  responsible_name: string | null;
+  stages_done: number;
+  stages_total: number;
+}
+
+export interface PaginatedProcedures {
+  items: ProcedureListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
