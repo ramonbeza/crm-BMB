@@ -1,0 +1,15 @@
+.env
+*.pyc
+__pycache__/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+node_modules/
+frontend/dist/
+nginx/certs/
+*.log
+.DS_Store
