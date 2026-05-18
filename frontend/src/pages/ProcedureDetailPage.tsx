@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, User, Briefcase } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Procedure, Stage, StageStatus, ProcedureStatus } from "@/types";
+import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, ChecklistStatus } from "@/types";
 import { formatDate } from "@/lib/utils";
 
 // ── label maps ───────────────────────────────────────────────────────────────
@@ -311,6 +311,163 @@ export function ProcedureDetailPage() {
             ))}
         </div>
       </div>
+
+      {/* Checklist */}
+      <ChecklistPanel procedureId={p.id} items={p.checklist_items} />
+    </div>
+  );
+}
+
+// ── ChecklistPanel ────────────────────────────────────────────────────────────
+
+const checklistStatusLabel: Record<ChecklistStatus, string> = {
+  pendente: "Pendente",
+  recebido: "Recebido",
+  em_analise: "Em análise",
+  aprovado: "Aprovado",
+  rejeitado: "Rejeitado",
+};
+
+const checklistStatusCls: Record<ChecklistStatus, string> = {
+  pendente: "bg-gray-100 text-gray-500",
+  recebido: "bg-blue-50 text-blue-600",
+  em_analise: "bg-amber-50 text-amber-600",
+  aprovado: "bg-green-50 text-green-600",
+  rejeitado: "bg-red-50 text-red-600",
+};
+
+function ChecklistPanel({ procedureId, items }: { procedureId: string; items: ChecklistItem[] }) {
+  const qc = useQueryClient();
+  const [newItem, setNewItem] = useState("");
+  const [newResp, setNewResp] = useState<"cliente" | "escritorio">("cliente");
+  const [addingItem, setAddingItem] = useState(false);
+
+  const updateItem = useMutation({
+    mutationFn: async ({ itemId, status }: { itemId: string; status: string }) =>
+      (await api.put(`/properties/checklist/item/${itemId}`, { status })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["procedure", procedureId] }),
+  });
+
+  const addItem = useMutation({
+    mutationFn: async () =>
+      (await api.post(`/properties/checklist/${procedureId}`, { name: newItem, responsavel: newResp })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["procedure", procedureId] });
+      setNewItem("");
+      setAddingItem(false);
+    },
+  });
+
+  const nextStatus: Record<string, ChecklistStatus> = {
+    pendente: "recebido",
+    recebido: "em_analise",
+    em_analise: "aprovado",
+    aprovado: "pendente",
+    rejeitado: "pendente",
+  };
+
+  const done = items.filter((i) => i.status === "aprovado").length;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-6 mt-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <FileText size={18} className="text-gray-400" />
+          <h2 className="text-base font-bold text-gray-900">Checklist de documentos</h2>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">{done}/{items.length} aprovado{done !== 1 ? "s" : ""}</span>
+          <button
+            onClick={() => setAddingItem((v) => !v)}
+            className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800"
+          >
+            <Plus size={14} />
+            Adicionar
+          </button>
+        </div>
+      </div>
+
+      {items.length === 0 && !addingItem && (
+        <p className="text-sm text-gray-400 text-center py-6">
+          Nenhum item de checklist. Este tipo de procedimento não possui template pré-definido ou nenhum item foi adicionado.
+        </p>
+      )}
+
+      <div className="space-y-1.5">
+        {[...items].sort((a, b) => a.order - b.order).map((item) => (
+          <div
+            key={item.id}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border ${
+              item.status === "aprovado"
+                ? "border-green-200 bg-green-50/30"
+                : item.status === "rejeitado"
+                ? "border-red-200 bg-red-50/30"
+                : "border-gray-100 hover:bg-gray-50"
+            }`}
+          >
+            <span className="text-xs text-gray-400 w-5 flex-shrink-0">{item.order}</span>
+
+            <span className={`flex-1 text-sm ${item.status === "aprovado" ? "line-through text-gray-400" : "text-gray-800"}`}>
+              {item.name}
+            </span>
+
+            <span
+              className={`flex items-center gap-1 text-xs flex-shrink-0 ${
+                item.responsavel === "cliente" ? "text-blue-500" : "text-purple-500"
+              }`}
+              title={item.responsavel === "cliente" ? "Responsável: Cliente" : "Responsável: Escritório"}
+            >
+              {item.responsavel === "cliente" ? <User size={12} /> : <Briefcase size={12} />}
+              {item.responsavel === "cliente" ? "Cliente" : "Escritório"}
+            </span>
+
+            <button
+              onClick={() => updateItem.mutate({ itemId: item.id, status: nextStatus[item.status] })}
+              disabled={updateItem.isPending}
+              className={`text-xs px-2 py-0.5 rounded-full font-medium border cursor-pointer transition-colors hover:opacity-80 ${checklistStatusCls[item.status as ChecklistStatus]} border-current/20`}
+              title="Clique para avançar o status"
+            >
+              {checklistStatusLabel[item.status as ChecklistStatus]}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {addingItem && (
+        <div className="mt-3 p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 space-y-2">
+          <input
+            autoFocus
+            placeholder="Nome do documento..."
+            value={newItem}
+            onChange={(e) => setNewItem(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && newItem.trim() && addItem.mutate()}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          />
+          <div className="flex items-center gap-2">
+            <select
+              value={newResp}
+              onChange={(e) => setNewResp(e.target.value as "cliente" | "escritorio")}
+              className="px-2 py-1.5 border border-gray-300 rounded-md text-xs bg-white"
+            >
+              <option value="cliente">Responsável: Cliente</option>
+              <option value="escritorio">Responsável: Escritório</option>
+            </select>
+            <button
+              onClick={() => addItem.mutate()}
+              disabled={!newItem.trim() || addItem.isPending}
+              className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-xs font-medium rounded-md"
+            >
+              Adicionar
+            </button>
+            <button
+              onClick={() => { setAddingItem(false); setNewItem(""); }}
+              className="px-3 py-1.5 border border-gray-200 text-xs text-gray-600 rounded-md hover:bg-white"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

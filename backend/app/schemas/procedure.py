@@ -45,6 +45,7 @@ class ProcedureBase(BaseModel):
     deadline: date | None = None
     tags: list[str] = []
     responsible_user_id: uuid.UUID | None = None
+    property_id: uuid.UUID | None = None
 
 
 class ProcedureCreate(ProcedureBase):
@@ -68,6 +69,20 @@ class ProcedureUpdate(BaseModel):
     tags: list[str] | None = None
     status: ProcedureStatus | None = None
     responsible_user_id: uuid.UUID | None = None
+    property_id: uuid.UUID | None = None
+
+
+class ChecklistItemRead(BaseModel):
+    id: uuid.UUID
+    procedure_id: uuid.UUID
+    order: int
+    name: str
+    responsavel: str
+    status: str
+    notas: str | None
+    received_at: datetime | None
+
+    model_config = {"from_attributes": True}
 
 
 class ProcedureRead(ProcedureBase):
@@ -81,6 +96,7 @@ class ProcedureRead(ProcedureBase):
     responsible_name: str | None = None
     procedure_type_label: str | None = None
     stages: list[StageRead] = []
+    checklist_items: list[ChecklistItemRead] = []
 
     model_config = {"from_attributes": True}
 

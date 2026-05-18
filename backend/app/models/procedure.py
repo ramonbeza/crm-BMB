@@ -93,9 +93,21 @@ class Procedure(Base, UUIDMixin, TimestampMixin):
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    property_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("properties.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     client = relationship("Client", foreign_keys=[client_id])
     responsible = relationship("User", foreign_keys=[responsible_user_id])
+    property: Mapped["Property | None"] = relationship(  # type: ignore[name-defined]
+        "Property", back_populates="procedures", foreign_keys=[property_id]
+    )
+    checklist_items: Mapped[list["ChecklistItem"]] = relationship(  # type: ignore[name-defined]
+        "ChecklistItem",
+        primaryjoin="Procedure.id == foreign(ChecklistItem.procedure_id)",
+        cascade="all, delete-orphan",
+        order_by="ChecklistItem.order",
+    )
     stages: Mapped[list["ProcedureStage"]] = relationship(
         "ProcedureStage",
         back_populates="procedure",

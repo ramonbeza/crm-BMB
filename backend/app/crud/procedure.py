@@ -39,11 +39,13 @@ def _client_display(client: Client | None) -> str | None:
 
 class CRUDProcedure(CRUDBase[Procedure]):
     def _q(self):
+        from app.models.property import ChecklistItem
         return select(Procedure).options(
             selectinload(Procedure.client).selectinload(Client.pf_data),
             selectinload(Procedure.client).selectinload(Client.pj_data),
             selectinload(Procedure.responsible),
             selectinload(Procedure.stages).selectinload(ProcedureStage.assigned_user),
+            selectinload(Procedure.checklist_items),
         )
 
     async def get_full(self, db: AsyncSession, id: UUID) -> Procedure | None:
@@ -65,6 +67,7 @@ class CRUDProcedure(CRUDBase[Procedure]):
         )
 
     def _to_read(self, p: Procedure) -> ProcedureRead:
+        from app.schemas.procedure import ChecklistItemRead
         return ProcedureRead(
             id=p.id,
             protocol_number=p.protocol_number,
@@ -82,12 +85,26 @@ class CRUDProcedure(CRUDBase[Procedure]):
             tags=p.tags or [],
             status=p.status,
             responsible_user_id=p.responsible_user_id,
+            property_id=p.property_id,
             attendance_id=p.attendance_id,
             created_at=p.created_at,
             updated_at=p.updated_at,
             client_name=_client_display(p.client),
             responsible_name=p.responsible.name if p.responsible else None,
             stages=[self._stage_read(s) for s in sorted(p.stages, key=lambda x: x.order)],
+            checklist_items=[
+                ChecklistItemRead(
+                    id=ci.id,
+                    procedure_id=ci.procedure_id,
+                    order=ci.order,
+                    name=ci.name,
+                    responsavel=ci.responsavel,
+                    status=ci.status,
+                    notas=ci.notas,
+                    received_at=ci.received_at,
+                )
+                for ci in sorted(p.checklist_items, key=lambda x: x.order)
+            ],
         )
 
     async def _next_protocol(self, db: AsyncSession) -> int:
@@ -112,6 +129,7 @@ class CRUDProcedure(CRUDBase[Procedure]):
             deadline=data.deadline,
             tags=data.tags or [],
             responsible_user_id=data.responsible_user_id,
+            property_id=getattr(data, "property_id", None),
             attendance_id=attendance_id,
             created_by_id=created_by_id,
         )
@@ -127,6 +145,11 @@ class CRUDProcedure(CRUDBase[Procedure]):
                     status=StageStatus.pendente,
                 )
             )
+
+        # Seed checklist from template
+        from app.crud.property import seed_checklist
+        await seed_checklist(db, p.id, data.procedure_type)
+
         await db.flush()
         return self._to_read(await self.get_full(db, p.id))
 
@@ -154,7 +177,7 @@ class CRUDProcedure(CRUDBase[Procedure]):
         for field in (
             "procedure_type", "opened_at", "description", "property_description",
             "matricula", "incra", "inscricao_imobiliaria", "requerente",
-            "deadline", "tags", "status", "responsible_user_id",
+            "deadline", "tags", "status", "responsible_user_id", "property_id",
         ):
             val = getattr(obj_in, field)
             if val is not None:

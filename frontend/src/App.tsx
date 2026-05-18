@@ -10,6 +10,8 @@ import { MeetingsPage } from "@/pages/MeetingsPage";
 import { AttendancesPage } from "@/pages/AttendancesPage";
 import { ProceduresPage } from "@/pages/ProceduresPage";
 import { ProcedureDetailPage } from "@/pages/ProcedureDetailPage";
+import { PropertiesPage } from "@/pages/PropertiesPage";
+import { PropertyDetailPage } from "@/pages/PropertyDetailPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +35,8 @@ export default function App() {
               <Route path="/atendimentos" element={<AttendancesPage />} />
               <Route path="/procedimentos" element={<ProceduresPage />} />
               <Route path="/procedimentos/:id" element={<ProcedureDetailPage />} />
+              <Route path="/imoveis" element={<PropertiesPage />} />
+              <Route path="/imoveis/:id" element={<PropertyDetailPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

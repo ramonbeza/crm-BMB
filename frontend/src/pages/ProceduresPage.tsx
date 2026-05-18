@@ -8,6 +8,7 @@ import type {
   ProcedureTypeOption,
   PaginatedClients,
   ProcedureStatus,
+  PaginatedProperties,
 } from "@/types";
 import { formatDate } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ interface FormState {
   property_description: string;
   deadline: string;
   tags: string;
+  property_id: string;
 }
 
 const emptyForm = (): FormState => ({
@@ -42,6 +44,7 @@ const emptyForm = (): FormState => ({
   property_description: "",
   deadline: "",
   tags: "",
+  property_id: "",
 });
 
 export function ProceduresPage() {
@@ -50,6 +53,7 @@ export function ProceduresPage() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [clientSearch, setClientSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [propertySearch, setPropertySearch] = useState("");
 
   const { data } = useQuery({
     queryKey: ["procedures", statusFilter],
@@ -69,6 +73,13 @@ export function ProceduresPage() {
     enabled: open,
   });
 
+  const { data: properties } = useQuery({
+    queryKey: ["properties-picker", propertySearch],
+    queryFn: async () =>
+      (await api.get<PaginatedProperties>(`/properties/?page_size=20${propertySearch ? `&search=${encodeURIComponent(propertySearch)}` : ""}`)).data,
+    enabled: open,
+  });
+
   const save = useMutation({
     mutationFn: async (f: FormState) => {
       const payload = {
@@ -80,6 +91,7 @@ export function ProceduresPage() {
         property_description: f.property_description || null,
         deadline: f.deadline || null,
         tags: f.tags ? f.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+        property_id: f.property_id || null,
       };
       return (await api.post("/procedures/", payload)).data;
     },
@@ -264,6 +276,28 @@ export function ProceduresPage() {
                   onChange={(e) => setForm({ ...form, property_description: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Imóvel vinculado (opcional)</label>
+                <input
+                  placeholder="Buscar por matrícula ou endereço..."
+                  value={propertySearch}
+                  onChange={(e) => setPropertySearch(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2"
+                />
+                <select
+                  value={form.property_id}
+                  onChange={(e) => setForm({ ...form, property_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                >
+                  <option value="">— nenhum —</option>
+                  {properties?.items.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.matricula ?? "Sem matrícula"} — {p.endereco ?? p.property_type_label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

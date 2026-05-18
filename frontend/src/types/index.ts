@@ -172,10 +172,12 @@ export interface Procedure {
   responsible_user_id: string | null;
   responsible_name: string | null;
   attendance_id: string | null;
+  property_id: string | null;
   created_at: string;
   updated_at: string;
   client_name: string | null;
   stages: Stage[];
+  checklist_items: ChecklistItem[];
 }
 
 export interface ProcedureListItem {
@@ -199,4 +201,72 @@ export interface PaginatedProcedures {
   page: number;
   page_size: number;
   pages: number;
+}
+
+// ── Sprint 4: Imóveis + Checklist ─────────────────────────────────────────────
+
+export type PropertyType = "urbano" | "rural" | "rural_urbano";
+export type ChecklistStatus = "pendente" | "recebido" | "em_analise" | "aprovado" | "rejeitado";
+export type ChecklistResponsavel = "cliente" | "escritorio";
+
+export interface PropertyOwner {
+  id: string;
+  client_id: string;
+  role: string;
+  client_name: string | null;
+  client_document: string | null;
+}
+
+export interface PropertyListItem {
+  id: string;
+  matricula: string | null;
+  inscricao_imobiliaria: string | null;
+  property_type: PropertyType;
+  property_type_label: string;
+  endereco: string | null;
+  area_total: number | null;
+  area_unit: string;
+  cartorio: string | null;
+  is_active: boolean;
+  procedure_count: number;
+  owner_names: string[];
+}
+
+export interface Property {
+  id: string;
+  matricula: string | null;
+  inscricao_imobiliaria: string | null;
+  incra_code: string | null;
+  property_type: PropertyType;
+  property_type_label: string;
+  endereco: string | null;
+  area_total: number | null;
+  area_unit: string;
+  cartorio: string | null;
+  confrontantes: string | null;
+  notas: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  owners: PropertyOwner[];
+  procedure_count: number;
+}
+
+export interface PaginatedProperties {
+  items: PropertyListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface ChecklistItem {
+  id: string;
+  procedure_id: string;
+  order: number;
+  name: string;
+  responsavel: ChecklistResponsavel;
+  status: ChecklistStatus;
+  notas: string | null;
+  received_at: string | null;
 }
