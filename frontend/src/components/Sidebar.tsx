@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Users, LayoutDashboard, LogOut, UserCircle2, Calendar, ClipboardList, FolderOpen, Building2 } from "lucide-react";
+import { Users, LayoutDashboard, LogOut, UserCircle2, Calendar, ClipboardList, FolderOpen, Building2, Receipt, FileCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
@@ -11,6 +11,8 @@ const navItems = [
   { to: "/atendimentos", label: "Atendimentos", icon: ClipboardList },
   { to: "/procedimentos", label: "Procedimentos", icon: FolderOpen },
   { to: "/imoveis", label: "Imóveis", icon: Building2 },
+  { to: "/orcamentos", label: "Orçamentos", icon: Receipt },
+  { to: "/contratos", label: "Contratos", icon: FileCheck },
 ];
 
 export function Sidebar() {

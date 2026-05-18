@@ -270,3 +270,145 @@ export interface ChecklistItem {
   notas: string | null;
   received_at: string | null;
 }
+
+// ── Sprint 5: Orçamentos + Contratos ─────────────────────────────────────────
+
+export type QuoteStatus =
+  | "rascunho"
+  | "enviado"
+  | "aguardando_assinatura"
+  | "assinado"
+  | "cancelado"
+  | "expirado";
+
+export type ContractStatus =
+  | "rascunho"
+  | "enviado"
+  | "aguardando_assinatura"
+  | "assinado"
+  | "cancelado";
+
+export type PaymentModel =
+  | "fixo"
+  | "parcelado"
+  | "exito"
+  | "fixo_mais_exito"
+  | "a_definir";
+
+export interface CustaItem {
+  name: string;
+  value: number;
+}
+
+export interface InstallmentItem {
+  due_date: string;
+  value: number;
+  status: "pendente" | "pago";
+}
+
+export interface QuoteListItem {
+  id: string;
+  formatted_number: string;
+  version: number;
+  client_id: string;
+  client_name: string | null;
+  procedure_id: string | null;
+  procedure_type_label: string | null;
+  status: QuoteStatus;
+  status_label: string;
+  total: number;
+  valid_until: string | null;
+  created_at: string;
+}
+
+export interface Quote {
+  id: string;
+  quote_number: number;
+  quote_year: number;
+  version: number;
+  formatted_number: string;
+  procedure_id: string | null;
+  client_id: string;
+  client_name: string | null;
+  procedure_type: string | null;
+  procedure_type_label: string | null;
+  status: QuoteStatus;
+  status_label: string;
+  honorarios_escritorio: number;
+  honorarios_despachante: number;
+  custas_estimadas: CustaItem[];
+  custas_total: number;
+  desconto: number;
+  desconto_motivo: string | null;
+  subtotal: number;
+  total: number;
+  valid_until: string | null;
+  notas: string | null;
+  sent_at: string | null;
+  signed_at: string | null;
+  created_by_id: string | null;
+  parent_quote_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedQuotes {
+  items: QuoteListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface ContractListItem {
+  id: string;
+  formatted_number: string;
+  client_id: string;
+  client_name: string | null;
+  procedure_id: string | null;
+  status: ContractStatus;
+  status_label: string;
+  payment_model_label: string;
+  total_value: number;
+  created_at: string;
+}
+
+export interface Contract {
+  id: string;
+  contract_number: number;
+  contract_year: number;
+  formatted_number: string;
+  quote_id: string | null;
+  procedure_id: string | null;
+  client_id: string;
+  client_name: string | null;
+  status: ContractStatus;
+  status_label: string;
+  payment_model: PaymentModel;
+  payment_model_label: string;
+  total_value: number;
+  installments: InstallmentItem[];
+  exito_percentual: number | null;
+  signed_at: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedContracts {
+  items: ContractListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface PriceTableEntry {
+  id: string;
+  procedure_type: string;
+  procedure_type_label: string;
+  base_honorarios: number;
+  base_despachante: number;
+  custas_tipicas: CustaItem[];
+  notas: string | null;
+}

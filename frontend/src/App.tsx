@@ -12,6 +12,9 @@ import { ProceduresPage } from "@/pages/ProceduresPage";
 import { ProcedureDetailPage } from "@/pages/ProcedureDetailPage";
 import { PropertiesPage } from "@/pages/PropertiesPage";
 import { PropertyDetailPage } from "@/pages/PropertyDetailPage";
+import { QuotesPage } from "@/pages/QuotesPage";
+import { QuoteDetailPage } from "@/pages/QuoteDetailPage";
+import { ContractsPage, ContractDetailPage } from "@/pages/ContractsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +40,10 @@ export default function App() {
               <Route path="/procedimentos/:id" element={<ProcedureDetailPage />} />
               <Route path="/imoveis" element={<PropertiesPage />} />
               <Route path="/imoveis/:id" element={<PropertyDetailPage />} />
+              <Route path="/orcamentos" element={<QuotesPage />} />
+              <Route path="/orcamentos/:id" element={<QuoteDetailPage />} />
+              <Route path="/contratos" element={<ContractsPage />} />
+              <Route path="/contratos/:id" element={<ContractDetailPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
