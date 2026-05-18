@@ -35,5 +35,25 @@ class Settings(BaseSettings):
     FIRST_ADMIN_PASSWORD: str = "Admin@123"
     FIRST_ADMIN_NAME: str = "Administrador"
 
+    # ── Comunicações ──────────────────────────────────────────────────────────
+    # SMTP (email)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "CRM Beza, Miranda e Bonetti"
+    SMTP_TLS: bool = True
+
+    # WhatsApp via Z-API (opcional)
+    ZAPI_INSTANCE_ID: str = ""
+    ZAPI_TOKEN: str = ""
+    ZAPI_CLIENT_TOKEN: str = ""
+
+    # WhatsApp via Evolution API (alternativa)
+    EVOLUTION_API_URL: str = ""
+    EVOLUTION_API_KEY: str = ""
+    EVOLUTION_INSTANCE: str = ""
+
 
 settings = Settings()

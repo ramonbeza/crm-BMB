@@ -1,13 +1,20 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
+import { NotificationBell } from "./NotificationBell";
 
 export function Layout() {
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto p-6">
-        <Outlet />
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar */}
+        <header className="flex-shrink-0 flex items-center justify-end px-4 py-2 bg-white border-b border-gray-200 h-12">
+          <NotificationBell />
+        </header>
+        <main className="flex-1 overflow-y-auto p-6">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
