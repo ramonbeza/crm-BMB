@@ -17,6 +17,7 @@ import app.models.meeting  # noqa: F401
 import app.models.procedure  # noqa: F401
 import app.models.property  # noqa: F401
 import app.models.quote  # noqa: F401
+import app.models.financial  # noqa: F401
 
 target_metadata = Base.metadata
 

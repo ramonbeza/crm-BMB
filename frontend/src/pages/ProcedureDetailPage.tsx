@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, User, Briefcase } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, User, Briefcase, DollarSign, X } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, ChecklistStatus } from "@/types";
+import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, ChecklistStatus, ProcedureFinancialSummary, FinancialEntryListItem, PaginatedFinancialEntries, EntryTipo, EntryCategory } from "@/types";
 import { formatDate } from "@/lib/utils";
 
 // ── label maps ───────────────────────────────────────────────────────────────
@@ -314,6 +314,9 @@ export function ProcedureDetailPage() {
 
       {/* Checklist */}
       <ChecklistPanel procedureId={p.id} items={p.checklist_items} />
+
+      {/* Financeiro */}
+      <FinancialPanel procedureId={p.id} />
     </div>
   );
 }
@@ -466,6 +469,268 @@ function ChecklistPanel({ procedureId, items }: { procedureId: string; items: Ch
               Cancelar
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── FinancialPanel ────────────────────────────────────────────────────────────
+
+const fmt = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const TIPO_OPTIONS: { value: EntryTipo; label: string }[] = [
+  { value: "custa_real", label: "Custa real" },
+  { value: "repasse_despachante", label: "Repasse ao despachante" },
+  { value: "honorario_recebido", label: "Honorário recebido" },
+];
+const CATEGORY_OPTIONS: { value: EntryCategory; label: string }[] = [
+  { value: "cartorio", label: "Cartório" },
+  { value: "imposto", label: "Imposto" },
+  { value: "taxa", label: "Taxa" },
+  { value: "diligencia", label: "Diligência" },
+  { value: "despachante", label: "Despachante" },
+  { value: "honorario", label: "Honorário" },
+  { value: "outro", label: "Outro" },
+];
+
+const entryStatusCls: Record<string, string> = {
+  pendente: "bg-amber-50 text-amber-700",
+  pago: "bg-green-50 text-green-700",
+  cancelado: "bg-gray-100 text-gray-400",
+};
+const tipoBadge: Record<string, string> = {
+  custa_real: "bg-red-50 text-red-600",
+  repasse_despachante: "bg-purple-50 text-purple-600",
+  honorario_recebido: "bg-blue-50 text-blue-600",
+};
+
+function FinancialPanel({ procedureId }: { procedureId: string }) {
+  const qc = useQueryClient();
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({
+    tipo: "custa_real" as EntryTipo,
+    category: "cartorio" as EntryCategory,
+    description: "",
+    value: "",
+    status: "pendente",
+    due_date: "",
+    notas: "",
+  });
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const { data: summary } = useQuery<ProcedureFinancialSummary>({
+    queryKey: ["financial-summary", procedureId],
+    queryFn: async () =>
+      (await api.get<ProcedureFinancialSummary>(`/financial/procedure/${procedureId}`)).data,
+  });
+
+  const { data: entries } = useQuery<PaginatedFinancialEntries>({
+    queryKey: ["financial-entries-proc", procedureId],
+    queryFn: async () =>
+      (await api.get<PaginatedFinancialEntries>("/financial/", {
+        params: { procedure_id: procedureId, page_size: 50 },
+      })).data,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () =>
+      api.post("/financial/", {
+        procedure_id: procedureId,
+        tipo: form.tipo,
+        category: form.category,
+        description: form.description,
+        value: parseFloat(form.value.replace(",", ".")) || 0,
+        status: form.status,
+        due_date: form.due_date || null,
+        notas: form.notas || null,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["financial-entries-proc", procedureId] });
+      qc.invalidateQueries({ queryKey: ["financial-summary", procedureId] });
+      qc.invalidateQueries({ queryKey: ["financial-dashboard"] });
+      setShowCreate(false);
+      setForm({ tipo: "custa_real", category: "cartorio", description: "", value: "", status: "pendente", due_date: "", notas: "" });
+    },
+  });
+
+  const payMutation = useMutation({
+    mutationFn: async (id: string) => api.post(`/financial/${id}/pagar`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["financial-entries-proc", procedureId] });
+      qc.invalidateQueries({ queryKey: ["financial-summary", procedureId] });
+    },
+  });
+
+  const items = entries?.items ?? [];
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-6 mt-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <DollarSign size={18} className="text-gray-400" />
+          <h2 className="text-base font-bold text-gray-900">Financeiro do procedimento</h2>
+        </div>
+        <button
+          onClick={() => setShowCreate((v) => !v)}
+          className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800"
+        >
+          <Plus size={14} />
+          Lançamento
+        </button>
+      </div>
+
+      {/* Summary grid */}
+      {summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500 mb-0.5">Orçado total</p>
+            <p className="text-sm font-bold text-gray-900">{fmt(summary.total_orcado)}</p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500 mb-0.5">Custas estimadas</p>
+            <p className="text-sm font-bold text-gray-900">{fmt(summary.custas_estimadas_total)}</p>
+          </div>
+          <div className={`rounded-lg p-3 ${summary.variacao_custas > 0 ? "bg-red-50" : "bg-green-50"}`}>
+            <p className="text-xs text-gray-500 mb-0.5">Variação custas</p>
+            <p className={`text-sm font-bold ${summary.variacao_custas > 0 ? "text-red-600" : "text-green-600"}`}>
+              {summary.variacao_custas >= 0 ? "+" : ""}{fmt(summary.variacao_custas)}
+            </p>
+          </div>
+          <div className="bg-amber-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500 mb-0.5">Custas reais pendentes</p>
+            <p className="text-sm font-bold text-amber-700">{fmt(summary.custas_reais_pendentes)}</p>
+          </div>
+          <div className="bg-purple-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500 mb-0.5">Repasses pendentes</p>
+            <p className="text-sm font-bold text-purple-700">{fmt(summary.repasses_pendentes)}</p>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500 mb-0.5">Parcelas a receber</p>
+            <p className="text-sm font-bold text-blue-700">{fmt(summary.parcelas_pendentes)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Create form */}
+      {showCreate && (
+        <div className="mb-4 p-4 border border-dashed border-primary-300 rounded-lg bg-primary-50/30 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-700">Novo lançamento</p>
+            <button onClick={() => setShowCreate(false)} className="text-gray-400 hover:text-gray-600">
+              <X size={14} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs text-gray-500 mb-0.5">Tipo</label>
+              <select
+                value={form.tipo}
+                onChange={(e) => set("tipo", e.target.value)}
+                className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 bg-white"
+              >
+                {TIPO_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-0.5">Categoria</label>
+              <select
+                value={form.category}
+                onChange={(e) => set("category", e.target.value)}
+                className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 bg-white"
+              >
+                {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <input
+            type="text"
+            placeholder="Descrição *"
+            value={form.description}
+            onChange={(e) => set("description", e.target.value)}
+            className="w-full text-xs border border-gray-200 rounded px-2 py-1.5"
+          />
+
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              type="text"
+              placeholder="Valor R$"
+              value={form.value}
+              onChange={(e) => set("value", e.target.value)}
+              className="text-xs border border-gray-200 rounded px-2 py-1.5"
+            />
+            <select
+              value={form.status}
+              onChange={(e) => set("status", e.target.value)}
+              className="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white"
+            >
+              <option value="pendente">Pendente</option>
+              <option value="pago">Pago</option>
+            </select>
+            <input
+              type="date"
+              value={form.due_date}
+              onChange={(e) => set("due_date", e.target.value)}
+              className="text-xs border border-gray-200 rounded px-2 py-1.5"
+              placeholder="Vencimento"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => createMutation.mutate()}
+              disabled={createMutation.isPending || !form.description || !form.value}
+              className="px-3 py-1.5 bg-primary-600 text-white text-xs rounded disabled:opacity-50"
+            >
+              {createMutation.isPending ? "Salvando..." : "Salvar"}
+            </button>
+            <button
+              onClick={() => setShowCreate(false)}
+              className="px-3 py-1.5 border border-gray-200 text-xs text-gray-600 rounded"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Entries list */}
+      {items.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-6">
+          Nenhum lançamento financeiro registrado para este procedimento.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {items.map((entry: FinancialEntryListItem) => (
+            <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-100 hover:bg-gray-50">
+              <span className={`text-xs px-2 py-0.5 rounded font-medium ${tipoBadge[entry.tipo] ?? ""}`}>
+                {entry.tipo_label}
+              </span>
+              <span className="flex-1 text-sm text-gray-800 truncate">{entry.description}</span>
+              <span className="text-sm font-semibold text-gray-900 tabular-nums">{fmt(entry.value)}</span>
+              <span className={`text-xs px-2 py-0.5 rounded font-medium ${entryStatusCls[entry.status] ?? ""}`}>
+                {entry.status_label}
+              </span>
+              {entry.due_date && (
+                <span className="text-xs text-gray-400">
+                  {new Date(entry.due_date + "T00:00:00").toLocaleDateString("pt-BR")}
+                </span>
+              )}
+              {entry.status === "pendente" && (
+                <button
+                  onClick={() => payMutation.mutate(entry.id)}
+                  disabled={payMutation.isPending}
+                  className="text-xs text-green-600 hover:text-green-800 disabled:opacity-40"
+                  title="Marcar como pago"
+                >
+                  <CheckCircle2 size={14} />
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

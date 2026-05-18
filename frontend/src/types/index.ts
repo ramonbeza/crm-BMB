@@ -412,3 +412,84 @@ export interface PriceTableEntry {
   custas_tipicas: CustaItem[];
   notas: string | null;
 }
+
+// ── Módulo 8 — Financeiro ──────────────────────────────────────────────────
+
+export type EntryTipo = "custa_real" | "repasse_despachante" | "honorario_recebido";
+export type EntryStatus = "pendente" | "pago" | "cancelado";
+export type EntryCategory =
+  | "cartorio"
+  | "imposto"
+  | "taxa"
+  | "diligencia"
+  | "despachante"
+  | "honorario"
+  | "outro";
+
+export interface FinancialEntryListItem {
+  id: string;
+  formatted_number: string | null;
+  tipo: EntryTipo;
+  tipo_label: string;
+  category: EntryCategory;
+  category_label: string;
+  description: string;
+  value: number;
+  status: EntryStatus;
+  status_label: string;
+  due_date: string | null;
+  paid_at: string | null;
+  procedure_id: string | null;
+  procedure_number: string | null;
+  contract_id: string | null;
+  client_id: string | null;
+  client_name: string | null;
+  created_at: string;
+}
+
+export interface FinancialEntry extends FinancialEntryListItem {
+  entry_number: number | null;
+  entry_year: number | null;
+  contract_number: string | null;
+  notas: string | null;
+  created_by_id: string;
+  updated_at: string;
+}
+
+export interface PaginatedFinancialEntries {
+  items: FinancialEntryListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface ProcedureFinancialSummary {
+  procedure_id: string;
+  quote_id: string | null;
+  honorarios_escritorio_orcado: number;
+  honorarios_despachante_orcado: number;
+  custas_estimadas_total: number;
+  total_orcado: number;
+  custas_reais_pagas: number;
+  custas_reais_pendentes: number;
+  repasses_pagos: number;
+  repasses_pendentes: number;
+  honorarios_recebidos: number;
+  contract_id: string | null;
+  total_contrato: number;
+  parcelas_pagas: number;
+  parcelas_pendentes: number;
+  variacao_custas: number;
+}
+
+export interface FinancialDashboard {
+  honorarios_a_receber: number;
+  honorarios_recebidos_mes: number;
+  custas_pendentes: number;
+  custas_pagas_mes: number;
+  repasses_pendentes: number;
+  repasses_pagos_mes: number;
+  vencimentos_proximos: FinancialEntryListItem[];
+  em_atraso: FinancialEntryListItem[];
+}
