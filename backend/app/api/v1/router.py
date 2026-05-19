@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import ai_documents, attendances, auth, clients, communications, financial, integrations, meetings, notifications, procedures, properties, quotes, reports, users
+from app.api.v1 import ai_documents, attendances, auth, clients, communications, financial, integrations, meetings, notifications, procedures, properties, quotes, reports, search, users
 
 router = APIRouter(prefix="/api/v1")
 
@@ -18,3 +18,4 @@ router.include_router(reports.router, prefix="/reports", tags=["reports"])
 router.include_router(integrations.router, prefix="/integrations", tags=["integrations"])
 router.include_router(ai_documents.router, prefix="/ai", tags=["ai-documents"])
 router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+router.include_router(search.router, prefix="/search", tags=["search"])
