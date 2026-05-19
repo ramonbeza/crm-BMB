@@ -1,9 +1,10 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.audit import audit
 from app.core.deps import CurrentUser, InternalOnly, get_session, is_despachante
 from app.crud.attendance import crud_attendance
 from app.crud.procedure import crud_procedure
@@ -55,11 +56,16 @@ async def list_procedures(
 
 @router.post("/", response_model=ProcedureRead, status_code=status.HTTP_201_CREATED)
 async def create_procedure(
+    request: Request,
     body: ProcedureCreate,
     current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
-    return await crud_procedure.create_procedure(db, obj_in=body, created_by_id=current_user.id)
+    result = await crud_procedure.create_procedure(db, obj_in=body, created_by_id=current_user.id)
+    await audit(db, request, current_user, "procedure.created",
+                entity_type="procedure", entity_id=str(result.id),
+                details={"procedure_type": body.procedure_type, "client_id": str(body.client_id)})
+    return result
 
 
 @router.post("/from-attendance", response_model=ProcedureRead, status_code=status.HTTP_201_CREATED)
@@ -93,6 +99,7 @@ async def get_procedure(
 
 @router.put("/{procedure_id}", response_model=ProcedureRead)
 async def update_procedure(
+    request: Request,
     procedure_id: UUID,
     body: ProcedureUpdate,
     current_user: CurrentUser,
@@ -107,7 +114,14 @@ async def update_procedure(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Despachante-externo não pode editar dados do procedimento. Use a rota de etapas.",
         )
-    return await crud_procedure.update_procedure(db, db_obj=p, obj_in=body)
+    old_status = p.status
+    result = await crud_procedure.update_procedure(db, db_obj=p, obj_in=body)
+    # Audita apenas quando há mudança de status
+    if body.status and body.status != old_status:
+        await audit(db, request, current_user, "procedure.status_changed",
+                    entity_type="procedure", entity_id=str(procedure_id),
+                    details={"old_status": old_status, "new_status": body.status})
+    return result
 
 
 @router.put("/{procedure_id}/stages/{stage_id}", response_model=StageRead)
@@ -133,6 +147,7 @@ async def update_stage(
 
 @router.delete("/{procedure_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_procedure(
+    request: Request,
     procedure_id: UUID,
     current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -145,5 +160,8 @@ async def delete_procedure(
     p = await crud_procedure.get_full(db, procedure_id)
     if not p:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedimento não encontrado")
+    await audit(db, request, current_user, "procedure.deleted",
+                entity_type="procedure", entity_id=str(procedure_id),
+                details={"protocol_number": p.protocol_number})
     await db.delete(p)
     await db.flush()

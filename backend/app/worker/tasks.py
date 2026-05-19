@@ -348,6 +348,16 @@ def check_deadlines() -> dict:
                         )
                         created += 1
 
+                        # Push em tempo real via Redis pub/sub → WebSocket
+                        try:
+                            from app.core.redis_pubsub import publish_notification_sync
+                            publish_notification_sync(
+                                user_id,
+                                {"title": title, "body": body, "link": link},
+                            )
+                        except Exception:
+                            pass  # Falha no push não bloqueia a criação da notificação
+
             conn.commit()
     finally:
         conn.close()

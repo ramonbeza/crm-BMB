@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -5,11 +6,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import router
 from app.core.config import settings
+from app.core.redis_pubsub import start_pubsub_listener
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Inicia o bridge Redis pub/sub → WebSocket em background
+    task = asyncio.create_task(start_pubsub_listener())
     yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(
