@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import CurrentUser, get_session
+from app.core.deps import InternalOnly, get_session
 from app.crud.meeting import crud_meeting
 from app.schemas.meeting import MeetingCreate, MeetingRead, MeetingUpdate, PaginatedMeetings
 
@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/", response_model=PaginatedMeetings)
 async def list_meetings(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -32,7 +32,7 @@ async def list_meetings(
 @router.post("/", response_model=MeetingRead, status_code=status.HTTP_201_CREATED)
 async def create_meeting(
     body: MeetingCreate,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     return await crud_meeting.create_meeting(db, obj_in=body, created_by_id=current_user.id)
@@ -41,7 +41,7 @@ async def create_meeting(
 @router.get("/{meeting_id}", response_model=MeetingRead)
 async def get_meeting(
     meeting_id: UUID,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     m = await crud_meeting.get_full(db, meeting_id)
@@ -54,7 +54,7 @@ async def get_meeting(
 async def update_meeting(
     meeting_id: UUID,
     body: MeetingUpdate,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     m = await crud_meeting.get_full(db, meeting_id)
@@ -66,7 +66,7 @@ async def update_meeting(
 @router.delete("/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_meeting(
     meeting_id: UUID,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     m = await crud_meeting.get_full(db, meeting_id)

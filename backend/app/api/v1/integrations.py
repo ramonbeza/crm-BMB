@@ -20,7 +20,7 @@ from googleapiclient.discovery import build
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.deps import CurrentUser
+from app.core.deps import InternalOnly
 from app.db.session import get_session
 from app.models.integration import GoogleCalendarToken
 
@@ -64,7 +64,7 @@ def _creds_from_token(token_row: GoogleCalendarToken) -> Credentials:
 # ── Google Calendar — OAuth2 ──────────────────────────────────────────────────
 
 @router.get("/google/auth-url", summary="Gera URL de autorização Google")
-async def google_auth_url(current_user: CurrentUser) -> dict[str, str]:
+async def google_auth_url(current_user: InternalOnly) -> dict[str, str]:
     """Retorna a URL para o usuário autorizar acesso ao Google Calendar."""
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=503, detail="Google Calendar não configurado.")
@@ -131,7 +131,7 @@ async def google_callback(
 
 @router.get("/google/status", summary="Status da conexão Google Calendar")
 async def google_status(
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, Any]:
     token = (
@@ -154,7 +154,7 @@ async def google_status(
 
 @router.delete("/google/disconnect", summary="Desconectar Google Calendar")
 async def google_disconnect(
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, str]:
     token = (
@@ -173,7 +173,7 @@ async def google_disconnect(
 @router.post("/google/sync-meeting/{meeting_id}", summary="Sincronizar reunião com Google Calendar")
 async def sync_meeting_to_google(
     meeting_id: uuid.UUID,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, Any]:
     """Cria ou atualiza um evento no Google Calendar para a reunião informada."""
@@ -263,7 +263,7 @@ async def sync_meeting_to_google(
 # ── ViaCEP ───────────────────────────────────────────────────────────────────
 
 @router.get("/viacep/{cep}", summary="Busca endereço por CEP (ViaCEP)")
-async def busca_cep(cep: str, _: CurrentUser) -> dict[str, Any]:
+async def busca_cep(cep: str, _: InternalOnly) -> dict[str, Any]:
     """Consulta a API pública ViaCEP e retorna endereço formatado."""
     clean = cep.replace("-", "").replace(".", "").strip()
     if not clean.isdigit() or len(clean) != 8:
@@ -296,7 +296,7 @@ async def busca_cep(cep: str, _: CurrentUser) -> dict[str, Any]:
 # ── BrasilAPI — CNPJ ─────────────────────────────────────────────────────────
 
 @router.get("/cnpj/{cnpj}", summary="Busca dados de empresa por CNPJ (BrasilAPI)")
-async def busca_cnpj(cnpj: str, _: CurrentUser) -> dict[str, Any]:
+async def busca_cnpj(cnpj: str, _: InternalOnly) -> dict[str, Any]:
     """Consulta BrasilAPI e retorna dados cadastrais da empresa."""
     clean = "".join(c for c in cnpj if c.isdigit())
     if len(clean) != 14:

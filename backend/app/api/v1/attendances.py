@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import CurrentUser, get_session
+from app.core.deps import InternalOnly, get_session
 from app.crud.attendance import crud_attendance
 from app.crud.meeting import crud_meeting
 from app.schemas.attendance import (
@@ -20,7 +20,7 @@ router = APIRouter()
 
 @router.get("/", response_model=PaginatedAttendances)
 async def list_attendances(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -31,7 +31,7 @@ async def list_attendances(
 
 @router.get("/pending-procedures", response_model=PaginatedAttendances)
 async def list_pending_procedures(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -43,7 +43,7 @@ async def list_pending_procedures(
 @router.post("/", response_model=AttendanceRead, status_code=status.HTTP_201_CREATED)
 async def create_attendance(
     body: AttendanceCreate,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     return await crud_attendance.create_attendance(db, obj_in=body, created_by_id=current_user.id)
@@ -52,7 +52,7 @@ async def create_attendance(
 @router.post("/from-meeting", response_model=AttendanceRead, status_code=status.HTTP_201_CREATED)
 async def create_attendance_from_meeting(
     body: AttendanceFromMeeting,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     meeting = await crud_meeting.get_full(db, body.meeting_id)
@@ -66,7 +66,7 @@ async def create_attendance_from_meeting(
 @router.get("/{attendance_id}", response_model=AttendanceRead)
 async def get_attendance(
     attendance_id: UUID,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     a = await crud_attendance.get_full(db, attendance_id)
@@ -79,7 +79,7 @@ async def get_attendance(
 async def update_attendance(
     attendance_id: UUID,
     body: AttendanceUpdate,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     a = await crud_attendance.get_full(db, attendance_id)
@@ -91,7 +91,7 @@ async def update_attendance(
 @router.delete("/{attendance_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_attendance(
     attendance_id: UUID,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     a = await crud_attendance.get_full(db, attendance_id)

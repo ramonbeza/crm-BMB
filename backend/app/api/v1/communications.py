@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.deps import CurrentUser, get_session
+from app.core.deps import CurrentUser, InternalOnly, get_session
 from app.crud import communication as crud
 from app.schemas.communication import (
     CommCreate,
@@ -34,7 +34,7 @@ router = APIRouter()
 
 @router.get("/templates/", response_model=list[TemplateRead])
 async def list_templates(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
     channel: Optional[str] = None,
     active_only: bool = True,
@@ -45,7 +45,7 @@ async def list_templates(
 @router.post("/templates/", response_model=TemplateRead, status_code=201)
 async def create_template(
     body: TemplateCreate,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     return await crud.create_template(db, obj_in=body, created_by_id=current_user.id)
@@ -54,7 +54,7 @@ async def create_template(
 @router.get("/templates/{template_id}", response_model=TemplateRead)
 async def get_template(
     template_id: uuid.UUID,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     t = await crud.get_template(db, template_id)
@@ -67,7 +67,7 @@ async def get_template(
 async def update_template(
     template_id: uuid.UUID,
     body: TemplateUpdate,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     t = await crud.update_template(db, template_id, body)
@@ -79,7 +79,7 @@ async def update_template(
 @router.delete("/templates/{template_id}", status_code=204)
 async def delete_template(
     template_id: uuid.UUID,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     ok = await crud.delete_template(db, template_id)
@@ -90,7 +90,7 @@ async def delete_template(
 @router.post("/templates/render", response_model=RenderResponse)
 async def render_template(
     body: RenderRequest,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     result = await crud.render_template(db, body)
@@ -103,7 +103,7 @@ async def render_template(
 
 @router.get("/", response_model=PaginatedComms)
 async def list_comms(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
@@ -124,7 +124,7 @@ async def list_comms(
 @router.post("/", response_model=CommRead, status_code=201)
 async def send_message(
     body: CommCreate,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     """
@@ -165,7 +165,7 @@ async def send_message(
 @router.get("/{comm_id}", response_model=CommRead)
 async def get_comm(
     comm_id: uuid.UUID,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     c = await crud.get_communication(db, comm_id)
@@ -178,7 +178,7 @@ async def get_comm(
 
 @router.get("/notifications/", response_model=list[NotificationRead])
 async def list_notifications(
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
     unread_only: bool = False,
     limit: int = Query(30, ge=1, le=100),
@@ -190,7 +190,7 @@ async def list_notifications(
 
 @router.get("/notifications/unread-count", response_model=UnreadCount)
 async def get_unread_count(
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     count = await crud.unread_count(db, recipient_id=current_user.id)
@@ -199,7 +199,7 @@ async def get_unread_count(
 
 @router.post("/notifications/mark-all-read", response_model=UnreadCount)
 async def mark_all_read(
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     count = await crud.mark_all_read(db, recipient_id=current_user.id)
@@ -209,7 +209,7 @@ async def mark_all_read(
 @router.post("/notifications/{notif_id}/read", status_code=204)
 async def mark_read(
     notif_id: uuid.UUID,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     ok = await crud.mark_read(db, notif_id, current_user.id)
@@ -222,7 +222,7 @@ async def mark_read(
 @router.post("/notifications/", response_model=NotificationRead, status_code=201)
 async def create_notification(
     body: NotificationCreate,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     return await crud.create_notification(db, obj_in=body)

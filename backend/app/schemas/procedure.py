@@ -69,6 +69,7 @@ class ProcedureUpdate(BaseModel):
     tags: list[str] | None = None
     status: ProcedureStatus | None = None
     responsible_user_id: uuid.UUID | None = None
+    executor_user_id: uuid.UUID | None = None
     property_id: uuid.UUID | None = None
 
 
@@ -89,11 +90,13 @@ class ProcedureRead(ProcedureBase):
     id: uuid.UUID
     protocol_number: int
     status: ProcedureStatus
+    executor_user_id: uuid.UUID | None = None
     attendance_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
     client_name: str | None = None
     responsible_name: str | None = None
+    executor_name: str | None = None
     procedure_type_label: str | None = None
     stages: list[StageRead] = []
     checklist_items: list[ChecklistItemRead] = []

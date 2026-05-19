@@ -52,4 +52,24 @@ def require_roles(*roles: UserRole):
     return _check
 
 
+# Apenas usuários internos (exclui despachante-externo)
+def _require_internal(current_user: CurrentUser) -> User:  # type: ignore[misc]
+    pass  # substituído pelo Depends abaixo
+
+
+async def _internal_only(current_user: CurrentUser) -> User:
+    if current_user.role == UserRole.despachante_externo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a usuários internos do escritório.",
+        )
+    return current_user
+
+
 AdminOnly = Annotated[User, Depends(require_roles(UserRole.admin))]
+InternalOnly = Annotated[User, Depends(_internal_only)]
+
+
+def is_despachante(user: User) -> bool:
+    """Retorna True se o usuário é despachante-externo."""
+    return user.role == UserRole.despachante_externo

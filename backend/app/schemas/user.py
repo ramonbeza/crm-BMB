@@ -10,6 +10,7 @@ class UserBase(BaseModel):
     name: str
     email: EmailStr
     role: UserRole = UserRole.estagiario
+    cnpj_empresa: str | None = None
 
 
 class UserCreate(UserBase):
@@ -29,6 +30,7 @@ class UserUpdate(BaseModel):
     role: UserRole | None = None
     is_active: bool | None = None
     password: str | None = None
+    cnpj_empresa: str | None = None
 
 
 class UserRead(UserBase):

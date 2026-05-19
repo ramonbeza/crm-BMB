@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import CurrentUser, get_session
+from app.core.deps import CurrentUser, InternalOnly, get_session
 from app.crud.client import crud_client
 from app.models.client import ClientType
 from app.models.user import UserRole
@@ -48,7 +48,7 @@ async def list_clients(
 @router.post("/pf", response_model=ClientPFRead, status_code=status.HTTP_201_CREATED)
 async def create_client_pf(
     body: ClientPFCreate,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     return await crud_client.create_pf(db, obj_in=body, created_by_id=current_user.id)
@@ -57,7 +57,7 @@ async def create_client_pf(
 @router.post("/pj", response_model=ClientPJRead, status_code=status.HTTP_201_CREATED)
 async def create_client_pj(
     body: ClientPJCreate,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     return await crud_client.create_pj(db, obj_in=body, created_by_id=current_user.id)
@@ -79,7 +79,7 @@ async def get_client(
 async def update_client_pf(
     client_id: UUID,
     body: ClientPFUpdate,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     client = await crud_client.get_with_data(db, client_id)
@@ -94,7 +94,7 @@ async def update_client_pf(
 async def update_client_pj(
     client_id: UUID,
     body: ClientPJUpdate,
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     client = await crud_client.get_with_data(db, client_id)
@@ -108,7 +108,7 @@ async def update_client_pj(
 @router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_client(
     client_id: UUID,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     if not _can_delete(current_user):

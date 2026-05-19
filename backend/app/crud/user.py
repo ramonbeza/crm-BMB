@@ -22,6 +22,7 @@ class CRUDUser(CRUDBase[User]):
             email=obj_in.email,
             password_hash=hash_password(obj_in.password),
             role=obj_in.role,
+            cnpj_empresa=obj_in.cnpj_empresa,
         )
         db.add(user)
         await db.flush()
@@ -39,6 +40,8 @@ class CRUDUser(CRUDBase[User]):
             db_obj.is_active = obj_in.is_active
         if obj_in.password is not None:
             db_obj.password_hash = hash_password(obj_in.password)
+        if obj_in.cnpj_empresa is not None:
+            db_obj.cnpj_empresa = obj_in.cnpj_empresa
         db.add(db_obj)
         await db.flush()
         await db.refresh(db_obj)

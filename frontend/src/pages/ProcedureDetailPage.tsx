@@ -3,9 +3,10 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, User, Briefcase, DollarSign, X, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, ChecklistStatus, ProcedureFinancialSummary, FinancialEntryListItem, PaginatedFinancialEntries, EntryTipo, EntryCategory } from "@/types";
+import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, ChecklistStatus, ProcedureFinancialSummary, FinancialEntryListItem, PaginatedFinancialEntries, EntryTipo, EntryCategory, User as UserType } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { AIDocumentPanel } from "@/components/AIDocumentPanel";
+import { useAuthStore } from "@/store/authStore";
 
 // ── label maps ───────────────────────────────────────────────────────────────
 
@@ -176,6 +177,8 @@ function StageRow({ stage, procedureId, onUpdate }: StageRowProps) {
 export function ProcedureDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const { user: currentUser } = useAuthStore();
+  const isInternal = currentUser?.role !== "despachante_externo";
 
   const { data: p, isLoading } = useQuery<Procedure>({
     queryKey: ["procedure", id],
@@ -183,9 +186,24 @@ export function ProcedureDetailPage() {
     enabled: !!id,
   });
 
+  const { data: despachantes } = useQuery<UserType[]>({
+    queryKey: ["users-despachantes"],
+    queryFn: async () => {
+      const res = await api.get<UserType[]>("/users/");
+      return res.data.filter((u) => u.role === "despachante_externo");
+    },
+    enabled: isInternal,
+  });
+
   const updateStatus = useMutation({
     mutationFn: async (newStatus: ProcedureStatus) =>
       (await api.put(`/procedures/${id}`, { status: newStatus })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["procedure", id] }),
+  });
+
+  const assignExecutor = useMutation({
+    mutationFn: async (executor_user_id: string | null) =>
+      (await api.put(`/procedures/${id}`, { executor_user_id })).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["procedure", id] }),
   });
 
@@ -241,23 +259,25 @@ export function ProcedureDetailPage() {
             <p className="text-sm text-gray-500 mt-1">{p.procedure_type_label}</p>
           </div>
 
-          {/* Status change */}
-          <div className="flex gap-2">
-            {(["em_andamento", "concluido", "cancelado"] as ProcedureStatus[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => updateStatus.mutate(s)}
-                disabled={p.status === s || updateStatus.isPending}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-40 disabled:cursor-default ${
-                  p.status === s
-                    ? statusCls[s]
-                    : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                }`}
-              >
-                {statusLabel[s]}
-              </button>
-            ))}
-          </div>
+          {/* Status change — only internal users */}
+          {isInternal && (
+            <div className="flex gap-2">
+              {(["em_andamento", "concluido", "cancelado"] as ProcedureStatus[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => updateStatus.mutate(s)}
+                  disabled={p.status === s || updateStatus.isPending}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-40 disabled:cursor-default ${
+                    p.status === s
+                      ? statusCls[s]
+                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  }`}
+                >
+                  {statusLabel[s]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Meta grid */}
@@ -272,6 +292,25 @@ export function ProcedureDetailPage() {
           {p.inscricao_imobiliaria && (
             <InfoField label="Inscrição Imobiliária" value={p.inscricao_imobiliaria} />
           )}
+          {/* Executor (despachante-externo) */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-1">Despachante executor</p>
+            {isInternal ? (
+              <select
+                value={p.executor_user_id ?? ""}
+                onChange={(e) => assignExecutor.mutate(e.target.value || null)}
+                disabled={assignExecutor.isPending}
+                className="text-sm border border-gray-200 rounded-md px-2 py-1 text-gray-700 bg-white w-full max-w-[200px]"
+              >
+                <option value="">— Sem executor —</option>
+                {(despachantes ?? []).map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-sm text-gray-900">{p.executor_name ?? "—"}</p>
+            )}
+          </div>
         </div>
 
         {p.property_description && (

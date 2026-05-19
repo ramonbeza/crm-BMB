@@ -13,6 +13,7 @@ class UserRole(str, Enum):
     admin = "admin"
     advogado = "advogado"
     estagiario = "estagiario"
+    despachante_externo = "despachante_externo"
 
 
 class User(Base, UUIDMixin, TimestampMixin):
@@ -23,6 +24,8 @@ class User(Base, UUIDMixin, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default=UserRole.estagiario)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Usado pelo despachante-externo para identificar a empresa parceira
+    cnpj_empresa: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"

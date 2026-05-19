@@ -87,6 +87,9 @@ class Procedure(Base, UUIDMixin, TimestampMixin):
     responsible_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    executor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     attendance_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("attendances.id", ondelete="SET NULL"), nullable=True
     )
@@ -99,6 +102,7 @@ class Procedure(Base, UUIDMixin, TimestampMixin):
 
     client = relationship("Client", foreign_keys=[client_id])
     responsible = relationship("User", foreign_keys=[responsible_user_id])
+    executor = relationship("User", foreign_keys=[executor_user_id])
     property: Mapped["Property | None"] = relationship(  # type: ignore[name-defined]
         "Property", back_populates="procedures", foreign_keys=[property_id]
     )

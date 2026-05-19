@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import CurrentUser, get_session
+from app.core.deps import CurrentUser, InternalOnly, get_session, is_despachante
 from app.crud.attendance import crud_attendance
 from app.crud.procedure import crud_procedure
 from app.models.procedure import PROCEDURE_TYPE_LABELS
@@ -30,7 +30,7 @@ async def list_procedure_types(_: CurrentUser):
 
 @router.get("/", response_model=PaginatedProcedures)
 async def list_procedures(
-    _: CurrentUser,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -40,17 +40,23 @@ async def list_procedures(
     responsible_user_id: UUID | None = Query(None),
     tag: str | None = Query(None),
 ):
+    # Despachante-externo só vê procedimentos onde é executor
+    executor_id: UUID | None = None
+    if is_despachante(current_user):
+        executor_id = current_user.id
+
     return await crud_procedure.list_paginated(
         db, page=page, page_size=page_size,
         procedure_type=procedure_type, status=status_filter,
-        client_id=client_id, responsible_user_id=responsible_user_id, tag=tag,
+        client_id=client_id, responsible_user_id=responsible_user_id,
+        tag=tag, executor_user_id=executor_id,
     )
 
 
 @router.post("/", response_model=ProcedureRead, status_code=status.HTTP_201_CREATED)
 async def create_procedure(
     body: ProcedureCreate,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     return await crud_procedure.create_procedure(db, obj_in=body, created_by_id=current_user.id)
@@ -59,7 +65,7 @@ async def create_procedure(
 @router.post("/from-attendance", response_model=ProcedureRead, status_code=status.HTTP_201_CREATED)
 async def create_procedure_from_attendance(
     body: ProcedureFromAttendance,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     attendance = await crud_attendance.get_full(db, body.attendance_id)
@@ -73,12 +79,15 @@ async def create_procedure_from_attendance(
 @router.get("/{procedure_id}", response_model=ProcedureRead)
 async def get_procedure(
     procedure_id: UUID,
-    _: CurrentUser,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     p = await crud_procedure.get_full(db, procedure_id)
     if not p:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedimento não encontrado")
+    # Despachante só pode ver seu próprio procedimento
+    if is_despachante(current_user) and p.executor_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado a este procedimento.")
     return crud_procedure._to_read(p)
 
 
@@ -86,12 +95,18 @@ async def get_procedure(
 async def update_procedure(
     procedure_id: UUID,
     body: ProcedureUpdate,
-    _: CurrentUser,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     p = await crud_procedure.get_full(db, procedure_id)
     if not p:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procedimento não encontrado")
+    # Despachante só pode atualizar etapas — não dados gerais do procedimento
+    if is_despachante(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Despachante-externo não pode editar dados do procedimento. Use a rota de etapas.",
+        )
     return await crud_procedure.update_procedure(db, db_obj=p, obj_in=body)
 
 
@@ -100,19 +115,26 @@ async def update_stage(
     procedure_id: UUID,
     stage_id: UUID,
     body: StageUpdate,
-    _: CurrentUser,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     stage = await crud_procedure.get_stage(db, stage_id)
     if not stage or stage.procedure_id != procedure_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Etapa não encontrada")
+
+    # Despachante pode atualizar etapas do seu procedimento
+    if is_despachante(current_user):
+        p = await crud_procedure.get_full(db, procedure_id)
+        if not p or p.executor_user_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado.")
+
     return await crud_procedure.update_stage(db, stage=stage, obj_in=body)
 
 
 @router.delete("/{procedure_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_procedure(
     procedure_id: UUID,
-    current_user: CurrentUser,
+    current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     if current_user.role not in (UserRole.admin, UserRole.advogado):

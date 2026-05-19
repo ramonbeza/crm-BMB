@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.deps import CurrentUser, get_session
+from app.core.deps import CurrentUser, InternalOnly, get_session
 from app.models.client import Client, ClientType
 from app.models.financial import FinancialEntry
 from app.models.meeting import Meeting
@@ -61,7 +61,7 @@ def _proc_opts():
 
 @router.get("/dashboard")
 async def dashboard_kpis(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     now = datetime.now(timezone.utc)
@@ -268,7 +268,7 @@ async def dashboard_kpis(
 
 @router.get("/procedures")
 async def report_procedures(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
     status: Optional[str] = None,
     procedure_type: Optional[str] = None,
@@ -325,7 +325,7 @@ async def report_procedures(
 
 @router.get("/financial")
 async def report_financial(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     contracts = (
@@ -406,7 +406,7 @@ async def report_financial(
 
 @router.get("/deadlines")
 async def report_deadlines(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
     days_ahead: int = Query(30, ge=1, le=365),
 ):
@@ -531,7 +531,7 @@ async def report_deadlines(
 
 @router.get("/export/procedures.xlsx")
 async def export_procedures_xlsx(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     import openpyxl
@@ -593,7 +593,7 @@ async def export_procedures_xlsx(
 
 @router.get("/export/financial.xlsx")
 async def export_financial_xlsx(
-    _: CurrentUser,
+    _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     import openpyxl

@@ -160,6 +160,7 @@ export function DashboardPage() {
     admin: "Administrador",
     advogado: "Advogado(a)",
     estagiario: "Estagiário(a)",
+    despachante_externo: "Despachante Externo",
   };
 
   if (isLoading || !data) {

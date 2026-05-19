@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "advogado" | "estagiario";
+export type UserRole = "admin" | "advogado" | "estagiario" | "despachante_externo";
 
 export interface User {
   id: string;
@@ -6,6 +6,7 @@ export interface User {
   email: string;
   role: UserRole;
   is_active: boolean;
+  cnpj_empresa?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -171,6 +172,8 @@ export interface Procedure {
   status: ProcedureStatus;
   responsible_user_id: string | null;
   responsible_name: string | null;
+  executor_user_id: string | null;
+  executor_name: string | null;
   attendance_id: string | null;
   property_id: string | null;
   created_at: string;

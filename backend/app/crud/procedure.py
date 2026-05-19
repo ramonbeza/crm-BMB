@@ -44,6 +44,7 @@ class CRUDProcedure(CRUDBase[Procedure]):
             selectinload(Procedure.client).selectinload(Client.pf_data),
             selectinload(Procedure.client).selectinload(Client.pj_data),
             selectinload(Procedure.responsible),
+            selectinload(Procedure.executor),
             selectinload(Procedure.stages).selectinload(ProcedureStage.assigned_user),
             selectinload(Procedure.checklist_items),
         )
@@ -85,12 +86,14 @@ class CRUDProcedure(CRUDBase[Procedure]):
             tags=p.tags or [],
             status=p.status,
             responsible_user_id=p.responsible_user_id,
+            executor_user_id=p.executor_user_id,
             property_id=p.property_id,
             attendance_id=p.attendance_id,
             created_at=p.created_at,
             updated_at=p.updated_at,
             client_name=_client_display(p.client),
             responsible_name=p.responsible.name if p.responsible else None,
+            executor_name=p.executor.name if p.executor else None,
             stages=[self._stage_read(s) for s in sorted(p.stages, key=lambda x: x.order)],
             checklist_items=[
                 ChecklistItemRead(
@@ -177,7 +180,7 @@ class CRUDProcedure(CRUDBase[Procedure]):
         for field in (
             "procedure_type", "opened_at", "description", "property_description",
             "matricula", "incra", "inscricao_imobiliaria", "requerente",
-            "deadline", "tags", "status", "responsible_user_id", "property_id",
+            "deadline", "tags", "status", "responsible_user_id", "executor_user_id", "property_id",
         ):
             val = getattr(obj_in, field)
             if val is not None:
@@ -227,6 +230,7 @@ class CRUDProcedure(CRUDBase[Procedure]):
         client_id: UUID | None = None,
         responsible_user_id: UUID | None = None,
         tag: str | None = None,
+        executor_user_id: UUID | None = None,
     ) -> PaginatedProcedures:
         q = self._q()
         if procedure_type:
@@ -239,6 +243,8 @@ class CRUDProcedure(CRUDBase[Procedure]):
             q = q.where(Procedure.responsible_user_id == responsible_user_id)
         if tag:
             q = q.where(Procedure.tags.contains([tag]))
+        if executor_user_id:
+            q = q.where(Procedure.executor_user_id == executor_user_id)
 
         total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar_one()
         offset = (page - 1) * page_size
