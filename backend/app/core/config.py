@@ -64,5 +64,15 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     CLAUDE_MODEL: str = "claude-sonnet-4-5"
 
+    # ── D4Sign ────────────────────────────────────────────────────────────────
+    D4SIGN_TOKEN_API: str = ""        # token de acesso à API
+    D4SIGN_CRYPT_KEY: str = ""        # chave de criptografia do cofre
+    D4SIGN_SAFE_UUID: str = ""        # UUID do cofre (safe) onde documentos ficam
+    D4SIGN_WEBHOOK_SECRET: str = ""   # segredo para validar webhooks
+
+    @property
+    def d4sign_configured(self) -> bool:
+        return bool(self.D4SIGN_TOKEN_API and self.D4SIGN_SAFE_UUID)
+
 
 settings = Settings()

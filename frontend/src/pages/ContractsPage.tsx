@@ -11,6 +11,7 @@ import type {
   PaymentModel,
 } from "@/types";
 import { formatDate } from "@/lib/utils";
+import { D4SignPanel } from "@/components/D4SignPanel";
 
 // ── maps ──────────────────────────────────────────────────────────────────────
 
@@ -352,6 +353,14 @@ export function ContractDetailPage() {
           />
         )}
       </div>
+
+      {/* D4Sign */}
+      <D4SignPanel
+        entityType="contracts"
+        entityId={c.id}
+        entityStatus={c.status}
+        onSigned={() => qc.invalidateQueries({ queryKey: ["contract", id] })}
+      />
     </div>
   );
 }

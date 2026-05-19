@@ -90,6 +90,11 @@ class Quote(UUIDMixin, TimestampMixin, Base):
     sent_at: Mapped[sa.DateTime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
     signed_at: Mapped[sa.DateTime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
 
+    # D4Sign
+    d4sign_document_uuid: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
+    d4sign_sign_url: Mapped[str | None] = mapped_column(sa.String(500), nullable=True)
+    d4sign_status: Mapped[str | None] = mapped_column(sa.String(30), nullable=True)
+
     created_by_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -137,6 +142,11 @@ class Contract(UUIDMixin, TimestampMixin, Base):
     signed_at: Mapped[sa.DateTime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
     signed_document_path: Mapped[str | None] = mapped_column(sa.String(500), nullable=True)
     notas: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+
+    # D4Sign
+    d4sign_document_uuid: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
+    d4sign_sign_url: Mapped[str | None] = mapped_column(sa.String(500), nullable=True)
+    d4sign_status: Mapped[str | None] = mapped_column(sa.String(30), nullable=True)
 
     created_by_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True

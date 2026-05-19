@@ -4,6 +4,7 @@ import { ArrowLeft, AlertCircle, FileText, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Quote, QuoteStatus } from "@/types";
 import { formatDate } from "@/lib/utils";
+import { D4SignPanel } from "@/components/D4SignPanel";
 
 // ── maps ──────────────────────────────────────────────────────────────────────
 
@@ -262,6 +263,14 @@ export function QuoteDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* D4Sign */}
+      <D4SignPanel
+        entityType="quotes"
+        entityId={q.id}
+        entityStatus={q.status}
+        onSigned={() => qc.invalidateQueries({ queryKey: ["quote", id] })}
+      />
     </div>
   );
 }
