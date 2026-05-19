@@ -51,6 +51,13 @@ class CRUDUser(CRUDBase[User]):
         result = await db.execute(select(User).where(User.is_active == True).order_by(User.name))
         return list(result.scalars().all())
 
+    async def get_all(self, db: AsyncSession, *, include_inactive: bool = False) -> list[User]:
+        q = select(User)
+        if not include_inactive:
+            q = q.where(User.is_active == True)
+        result = await db.execute(q.order_by(User.is_active.desc(), User.name))
+        return list(result.scalars().all())
+
     # ── Refresh tokens ──────────────────────────────────────────────────────
 
     async def create_refresh_token(

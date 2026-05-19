@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import AdminOnly, CurrentUser, get_session
@@ -16,8 +16,9 @@ router = APIRouter()
 async def list_users(
     _: AdminOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
+    include_inactive: bool = Query(False),
 ):
-    return await crud_user.get_all_active(db)
+    return await crud_user.get_all(db, include_inactive=include_inactive)
 
 
 @router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)

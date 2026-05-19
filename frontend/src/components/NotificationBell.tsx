@@ -1,35 +1,33 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, CheckCheck, ExternalLink, Info, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { Bell, BellDot, CheckCheck, ExternalLink, Clock, Info } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useNotificationsWS } from "@/hooks/useNotifications";
 
 interface NotificationItem {
   id: string;
   title: string;
   body: string | null;
   link: string | null;
-  tipo: string;
-  is_read: boolean;
+  notification_type: string;
+  read: boolean;
   created_at: string;
 }
 
-interface UnreadCount {
-  count: number;
-}
-
-const tipoIcon: Record<string, React.ElementType> = {
-  info: Info,
-  sucesso: CheckCircle2,
-  aviso: AlertTriangle,
-  erro: XCircle,
+const typeCls: Record<string, string> = {
+  deadline_alert: "border-l-orange-400",
+  aviso: "border-l-orange-400",
+  stage_update: "border-l-blue-400",
+  procedure_assigned: "border-l-green-400",
+  sucesso: "border-l-green-400",
+  system: "border-l-gray-300",
+  info: "border-l-blue-300",
 };
 
-const tipoCls: Record<string, string> = {
-  info: "text-blue-500",
-  sucesso: "text-green-500",
-  aviso: "text-amber-500",
-  erro: "text-red-500",
+const typeIcon: Record<string, typeof Clock> = {
+  deadline_alert: Clock,
+  system: Info,
 };
 
 function timeAgo(iso: string): string {
@@ -45,74 +43,73 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Close when clicking outside
+  // Conexão WebSocket para notificações em tempo real
+  useNotificationsWS();
+
+  // Fecha ao clicar fora
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const { data: countData } = useQuery<UnreadCount>({
-    queryKey: ["notif-count"],
-    queryFn: async () =>
-      (await api.get<UnreadCount>("/communications/notifications/unread-count")).data,
-    refetchInterval: 30_000,  // poll every 30s
+  const { data: countData } = useQuery<{ count: number }>({
+    queryKey: ["notifications-count"],
+    queryFn: async () => (await api.get("/notifications/unread-count")).data,
+    refetchInterval: 60_000,
   });
 
-  const { data: notifications } = useQuery<NotificationItem[]>({
+  const { data: notifications = [] } = useQuery<NotificationItem[]>({
     queryKey: ["notifications"],
-    queryFn: async () =>
-      (await api.get<NotificationItem[]>("/communications/notifications/", {
-        params: { limit: 20 },
-      })).data,
+    queryFn: async () => (await api.get("/notifications/")).data,
     enabled: open,
   });
 
   const markRead = useMutation({
-    mutationFn: async (id: string) =>
-      api.post(`/communications/notifications/${id}/read`),
+    mutationFn: async (id: string) => api.post(`/notifications/${id}/read`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["notif-count"] });
+      qc.invalidateQueries({ queryKey: ["notifications-count"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 
   const markAll = useMutation({
-    mutationFn: async () =>
-      api.post("/communications/notifications/mark-all-read"),
+    mutationFn: async () => api.post("/notifications/read-all"),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["notif-count"] });
+      qc.invalidateQueries({ queryKey: ["notifications-count"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 
-  const unread = countData?.count ?? 0;
+  const count = countData?.count ?? 0;
 
   return (
     <div ref={ref} className="relative">
+      {/* Sino */}
       <button
         onClick={() => setOpen((v) => !v)}
         className="relative p-2 rounded-md text-primary-200 hover:bg-primary-800 hover:text-white transition-colors"
         title="Notificações"
       >
-        <Bell size={18} />
-        {unread > 0 && (
-          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
-            {unread > 99 ? "99+" : unread}
+        {count > 0 ? <BellDot size={18} /> : <Bell size={18} />}
+        {count > 0 && (
+          <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+            {count > 99 ? "99+" : count}
           </span>
         )}
       </button>
 
+      {/* Dropdown */}
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <p className="text-sm font-semibold text-gray-900">Notificações</p>
-            {unread > 0 && (
+            <p className="text-sm font-semibold text-gray-900">
+              Notificações {count > 0 && <span className="text-red-500">({count})</span>}
+            </p>
+            {count > 0 && (
               <button
                 onClick={() => markAll.mutate()}
                 disabled={markAll.isPending}
@@ -124,37 +121,36 @@ export function NotificationBell() {
             )}
           </div>
 
-          {/* List */}
-          <div className="max-h-80 overflow-y-auto">
-            {!notifications || notifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-                <Bell size={24} className="mb-2 opacity-40" />
+          {/* Lista */}
+          <div className="max-h-96 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                <Bell size={28} className="mb-2 opacity-30" />
                 <p className="text-sm">Nenhuma notificação</p>
               </div>
             ) : (
               notifications.map((n) => {
-                const Icon = tipoIcon[n.tipo] ?? Info;
-                const cls = tipoCls[n.tipo] ?? "text-blue-500";
+                const Icon = typeIcon[n.notification_type] ?? Info;
+                const borderCls = typeCls[n.notification_type] ?? "border-l-gray-200";
 
-                const content = (
+                const inner = (
                   <div
-                    className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 last:border-0 cursor-pointer transition-colors ${
-                      n.is_read ? "opacity-60" : "bg-blue-50/30 hover:bg-blue-50/50"
-                    } hover:bg-gray-50`}
-                    onClick={() => {
-                      if (!n.is_read) markRead.mutate(n.id);
-                      if (!n.link) setOpen(false);
-                    }}
+                    className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 border-l-4 ${borderCls} ${
+                      !n.read ? "bg-blue-50/40" : "hover:bg-gray-50"
+                    } transition-colors cursor-pointer`}
+                    onClick={() => { if (!n.read) markRead.mutate(n.id); }}
                   >
-                    <Icon size={16} className={`mt-0.5 flex-shrink-0 ${cls}`} />
+                    <Icon size={15} className="mt-0.5 flex-shrink-0 text-gray-400" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 leading-tight">{n.title}</p>
+                      <p className={`text-sm leading-snug ${!n.read ? "font-semibold text-gray-900" : "text-gray-700"}`}>
+                        {n.title}
+                      </p>
                       {n.body && (
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
                       )}
                       <p className="text-xs text-gray-400 mt-1">{timeAgo(n.created_at)}</p>
                     </div>
-                    {n.link && <ExternalLink size={12} className="text-gray-300 flex-shrink-0 mt-0.5" />}
+                    {n.link && <ExternalLink size={12} className="text-gray-300 mt-0.5 flex-shrink-0" />}
                   </div>
                 );
 
@@ -162,30 +158,16 @@ export function NotificationBell() {
                   <Link
                     key={n.id}
                     to={n.link}
-                    onClick={() => {
-                      if (!n.is_read) markRead.mutate(n.id);
-                      setOpen(false);
-                    }}
+                    onClick={() => { if (!n.read) markRead.mutate(n.id); setOpen(false); }}
                     className="block"
                   >
-                    {content}
+                    {inner}
                   </Link>
                 ) : (
-                  <div key={n.id}>{content}</div>
+                  <div key={n.id}>{inner}</div>
                 );
               })
             )}
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
-            <Link
-              to="/comunicacoes"
-              onClick={() => setOpen(false)}
-              className="text-xs text-primary-600 hover:text-primary-800"
-            >
-              Ver todas as comunicações →
-            </Link>
           </div>
         </div>
       )}
