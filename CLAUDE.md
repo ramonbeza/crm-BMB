@@ -265,6 +265,8 @@ alembic history --verbose
 | **Sprint 13** | ✅ | `bd82295` | Gestão de usuários: UsersPage, UserFormModal, CNPJ, toggle ativo/inativo |
 | **Sprint 14** | ✅ | `bd82295` | WebSocket notifications: ConnectionManager, NotificationBell, useNotificationsWS |
 | **Sprint 15** | ✅ | `46c3acb` | WS push (Redis pub/sub), Celery Beat (deadlines 08h), Audit Log append-only |
+| **Sprint 16** | ✅ | `cfb5769` | Busca global: GET /search — clientes, procedimentos, imóveis + GlobalSearch no header |
+| **Sprint 17** | ✅ | `6616546` | D4Sign: assinatura digital de orçamentos/contratos + webhook HMAC + D4SignPanel |
 
 ---
 
