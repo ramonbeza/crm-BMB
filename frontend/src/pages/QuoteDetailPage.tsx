@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, AlertCircle, FileText, RefreshCw } from "lucide-react";
+import { ArrowLeft, AlertCircle, FileText, RefreshCw, Download } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Quote, QuoteStatus } from "@/types";
 import { formatDate } from "@/lib/utils";
@@ -151,6 +151,16 @@ export function QuoteDetailPage() {
                 Cancelar
               </button>
             )}
+
+            {/* Download PDF */}
+            <a
+              href={`/api/v1/quotes/${q.id}/pdf`}
+              download={`${q.formatted_number}.pdf`}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-md hover:bg-gray-50"
+            >
+              <Download size={12} />
+              Baixar PDF
+            </a>
 
             {/* New version */}
             <button

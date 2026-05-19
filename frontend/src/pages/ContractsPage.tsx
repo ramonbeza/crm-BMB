@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, AlertCircle, Plus, Trash2, Download } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import type {
@@ -221,6 +221,16 @@ export function ContractDetailPage() {
                 Cancelar
               </button>
             )}
+
+            {/* Download PDF */}
+            <a
+              href={`/api/v1/quotes/contratos/${c.id}/pdf`}
+              download={`${c.formatted_number}.pdf`}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-md hover:bg-gray-50"
+            >
+              <Download size={12} />
+              Baixar PDF
+            </a>
           </div>
         </div>
 

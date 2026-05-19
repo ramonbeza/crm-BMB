@@ -2,10 +2,14 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import CurrentUser, get_session
+from app.core.pdf_gen import generate_contract_pdf, generate_quote_pdf
 from app.crud.quote import (
+    _contract_to_read,
+    _quote_to_read,
     create_contract,
     create_quote,
     get_contract,
@@ -169,3 +173,71 @@ async def upsert_price_ep(
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     return await upsert_price_entry(db, procedure_type=procedure_type, obj_in=body)
+
+
+# ── PDF download ───────────────────────────────────────────────────────────────
+
+@router.get("/{quote_id}/pdf", summary="Baixar orçamento em PDF")
+async def download_quote_pdf(
+    quote_id: UUID,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    q_orm = await get_quote(db, quote_id)
+    if not q_orm:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    q = _quote_to_read(q_orm)
+
+    pdf_bytes = generate_quote_pdf(
+        formatted_number=q.formatted_number,
+        client_name=q.client_name or "—",
+        procedure_type_label=q.procedure_type_label,
+        honorarios_escritorio=float(q.honorarios_escritorio),
+        honorarios_despachante=float(q.honorarios_despachante),
+        custas_list=[{"name": c.name, "value": float(c.value)} for c in q.custas_estimadas],
+        desconto=float(q.desconto),
+        desconto_motivo=q.desconto_motivo,
+        total=float(q.total),
+        valid_until=q.valid_until,
+        notas=q.notas,
+        status_label=q.status_label,
+    )
+    filename = f"{q.formatted_number.replace('/', '-')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/contratos/{contract_id}/pdf", summary="Baixar contrato em PDF")
+async def download_contract_pdf(
+    contract_id: UUID,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    c_orm = await get_contract(db, contract_id)
+    if not c_orm:
+        raise HTTPException(status_code=404, detail="Contrato não encontrado")
+    c = _contract_to_read(c_orm)
+
+    pdf_bytes = generate_contract_pdf(
+        formatted_number=c.formatted_number,
+        client_name=c.client_name or "—",
+        payment_model_label=c.payment_model_label,
+        total_value=float(c.total_value),
+        installments=[
+            {"due_date": inst.due_date, "value": float(inst.value), "status": inst.status}
+            for inst in c.installments
+        ],
+        exito_percentual=float(c.exito_percentual) if c.exito_percentual else None,
+        notas=c.notas,
+        status_label=c.status_label,
+        quote_number=None,
+    )
+    filename = f"{c.formatted_number.replace('/', '-')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
