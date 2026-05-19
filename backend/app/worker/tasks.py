@@ -150,7 +150,7 @@ def send_whatsapp_zapi(self, comm_id: str, phone: str, body: str) -> dict:
             return {"ok": False, "error": str(exc)}
 
 
-# ── WhatsApp via Evolution API ────────────────────────────────────────────────
+# ── WhatsApp via Evolution API ─────────────────────────────────────────────────
 
 @celery_app.task(name="worker.send_whatsapp_evolution", bind=True, max_retries=3, default_retry_delay=60)
 def send_whatsapp_evolution(self, comm_id: str, phone: str, body: str) -> dict:
@@ -179,4 +179,81 @@ def send_whatsapp_evolution(self, comm_id: str, phone: str, body: str) -> dict:
             raise self.retry(exc=exc)
         except self.MaxRetriesExceededError:
             _update_comm_status(comm_id, "falhou", error_message=str(exc))
+            return {"ok": False, "error": str(exc)}
+
+
+# ── Geração de documentos com Claude API ─────────────────────────────────────
+
+def _update_ai_doc(doc_id: str, **fields) -> None:
+    """Atualiza um AIDocument diretamente via psycopg2 (síncrono)."""
+    import os
+    import psycopg2
+
+    dsn = os.environ.get("DATABASE_URL_SYNC", "")
+    if not dsn:
+        return
+
+    set_clauses = ["updated_at = now()"]
+    params: list = []
+    for k, v in fields.items():
+        set_clauses.append(f"{k} = %s")
+        params.append(v)
+
+    params.append(doc_id)
+    sql = f"UPDATE ai_documents SET {', '.join(set_clauses)} WHERE id = %s"
+    try:
+        conn = psycopg2.connect(dsn)
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+        conn.close()
+    except Exception:
+        pass
+
+
+@celery_app.task(name="worker.generate_ai_document", bind=True, max_retries=2, default_retry_delay=30)
+def generate_ai_document(self, doc_id: str, doc_type: str, context: dict) -> dict:
+    """Gera um documento jurídico usando a Claude API e salva no banco."""
+    from app.core.config import settings
+    from app.worker.ai_prompts import SYSTEM_PROMPT, build_prompt
+
+    if not settings.ANTHROPIC_API_KEY:
+        _update_ai_doc(doc_id, status="falhou", error_message="ANTHROPIC_API_KEY não configurado")
+        return {"ok": False, "error": "API key not configured"}
+
+    _update_ai_doc(doc_id, status="gerando")
+
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        user_prompt = build_prompt(doc_type, context)
+
+        message = client.messages.create(
+            model=settings.CLAUDE_MODEL,
+            max_tokens=4096,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+        content = message.content[0].text if message.content else ""
+        tokens_in = message.usage.input_tokens
+        tokens_out = message.usage.output_tokens
+
+        _update_ai_doc(
+            doc_id,
+            status="concluido",
+            content=content,
+            model_used=settings.CLAUDE_MODEL,
+            tokens_input=tokens_in,
+            tokens_output=tokens_out,
+            prompt_used=user_prompt,
+        )
+        return {"ok": True, "tokens_in": tokens_in, "tokens_out": tokens_out}
+
+    except Exception as exc:
+        try:
+            raise self.retry(exc=exc)
+        except self.MaxRetriesExceededError:
+            _update_ai_doc(doc_id, status="falhou", error_message=str(exc))
             return {"ok": False, "error": str(exc)}

@@ -20,6 +20,7 @@ import app.models.quote  # noqa: F401
 import app.models.financial  # noqa: F401
 import app.models.communication  # noqa: F401
 import app.models.integration  # noqa: F401
+import app.models.ai_document  # noqa: F401
 
 target_metadata = Base.metadata
 

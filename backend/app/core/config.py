@@ -60,5 +60,9 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost/api/v1/integrations/google/callback"
 
+    # ── Claude / Anthropic API ────────────────────────────────────────────────
+    ANTHROPIC_API_KEY: str = ""
+    CLAUDE_MODEL: str = "claude-sonnet-4-5"
+
 
 settings = Settings()

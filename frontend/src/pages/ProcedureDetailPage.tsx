@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, User, Briefcase, DollarSign, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, User, Briefcase, DollarSign, X, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, ChecklistStatus, ProcedureFinancialSummary, FinancialEntryListItem, PaginatedFinancialEntries, EntryTipo, EntryCategory } from "@/types";
 import { formatDate } from "@/lib/utils";
+import { AIDocumentPanel } from "@/components/AIDocumentPanel";
 
 // ── label maps ───────────────────────────────────────────────────────────────
 
@@ -317,6 +318,18 @@ export function ProcedureDetailPage() {
 
       {/* Financeiro */}
       <FinancialPanel procedureId={p.id} />
+
+      {/* IA — Geração de documentos */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6 mt-5">
+        <div className="flex items-center gap-2 mb-5">
+          <div className="p-1.5 bg-violet-50 rounded-lg">
+            <Sparkles size={16} className="text-violet-600" />
+          </div>
+          <h2 className="text-base font-bold text-gray-900">Documentos com IA</h2>
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full ml-1">Claude</span>
+        </div>
+        <AIDocumentPanel procedureId={p.id} />
+      </div>
     </div>
   );
 }
