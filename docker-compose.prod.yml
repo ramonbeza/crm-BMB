@@ -1,0 +1,138 @@
+# docker-compose.prod.yml — sobreposição para produção
+# Uso: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Diferenças em relação ao arquivo base (docker-compose.yml):
+#   • Backend/worker: sem volume de bind-mount (usa código da imagem)
+#   • Backend: workers ajustáveis via BACKEND_WORKERS (padrão 4)
+#   • Nginx: aponta para nginx.prod.conf (HTTPS + certbot)
+#   • Certbot: novo serviço para obter/renovar certificados Let's Encrypt
+#   • MinIO: porta de console removida (acesso só interno)
+#   • Logging: json-file com rotação
+
+services:
+  db:
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  redis:
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  minio:
+    restart: always
+    ports: []   # Remove a porta 9001 exposta no base — console só via túnel SSH
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    restart: always
+    volumes: []   # Remove o bind-mount de ./backend:/app (dev only)
+    environment:
+      ENVIRONMENT: production
+      BACKEND_WORKERS: ${BACKEND_WORKERS:-4}
+      # Google OAuth callback deve apontar para o domínio de produção
+      GOOGLE_REDIRECT_URI: https://${DOMAIN}/api/v1/integrations/google/callback
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.initial_data &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000
+               --workers ${BACKEND_WORKERS:-4}
+               --proxy-headers
+               --forwarded-allow-ips='*'"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+  celery_worker:
+    restart: always
+    volumes: []   # Remove o bind-mount
+    command: >
+      celery -A app.worker.celery_app worker
+        --loglevel=info
+        --concurrency=${CELERY_CONCURRENCY:-4}
+        --max-tasks-per-child=100
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "5"
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    command: >
+      celery -A app.worker.celery_app beat
+        --loglevel=info
+        --scheduler redbeat.RedBeatScheduler
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-crm_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-crm_beza}
+      DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-crm_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-crm_beza}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - crm_net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
+      - certbot_webroot:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  certbot:
+    image: certbot/certbot:latest
+    restart: "no"
+    volumes:
+      - certbot_webroot:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    # Renovação automática: invocado via cron do host ou Makefile `make renew`
+    entrypoint: >
+      sh -c "trap exit TERM;
+             while :; do
+               certbot renew --webroot -w /var/www/certbot --quiet;
+               sleep 12h & wait $${!};
+             done"
+    networks:
+      - crm_net
+
+volumes:
+  certbot_webroot:
+  certbot_certs:

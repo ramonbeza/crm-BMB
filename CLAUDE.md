@@ -248,18 +248,20 @@ alembic history --verbose
 
 ## Sprints
 
-| Sprint | Status | Descrição |
-|---|---|---|
-| **Sprint 1** | ✅ Concluído | Docker + FastAPI + PostgreSQL + Redis + Nginx + Auth JWT+RBAC + CRUD Clientes |
-| **Sprint 2** | ✅ Concluído | Agenda/Calendário (FullCalendar) + Atendimentos (Meeting/Attendance, pipeline básico) |
-| **Sprint 3** | ✅ Concluído | Procedimentos + 8 Etapas padrão + Protocolo BMB-YYYY-0001 + ProcedureDetailPage |
-| **Sprint 4** | ⏳ Próximo | Imóveis (Módulo 3) + Checklist de documentos (Módulo 7) por tipo de procedimento |
-| **Sprint 5** | ⏳ | Orçamentos BMB-ORC-YYYY-0001 + Contratos de honorários + D4Sign (assinatura digital) |
-| **Sprint 6** | ⏳ | Gestão financeira: honorários, custas, repasse ao despachante externo |
-| **Sprint 7** | ⏳ | Comunicações: WhatsApp Business (Z-API/Evolution) + e-mail SMTP + notificações internas |
-| **Sprint 8** | ⏳ | Dashboard + relatórios + exportação PDF/Excel + gestão de prazos |
-| **Sprint 9** | ⏳ | Integrações: Google Calendar OAuth2 + ViaCEP + BrasilAPI (CNPJ lookup) |
-| **Sprint 10** | ⏳ | IA: Redis Streams + Celery + Claude API — geração automática de documentos |
+| Sprint | Status | Commit | Descrição |
+|---|---|---|---|
+| **Sprint 1** | ✅ | — | Docker + FastAPI + PostgreSQL + Redis + Nginx + Auth JWT+RBAC + CRUD Clientes |
+| **Sprint 2** | ✅ | — | Agenda/Calendário (FullCalendar) + Atendimentos (Meeting/Attendance, pipeline básico) |
+| **Sprint 3** | ✅ | — | Procedimentos + 8 Etapas padrão + Protocolo BMB-YYYY-0001 + ProcedureDetailPage |
+| **Sprint 4** | ✅ | — | Imóveis + Checklist por tipo de procedimento + PropertyDetailPage |
+| **Sprint 5** | ✅ | — | Orçamentos BMB-ORC-YYYY-0001 + Contratos de honorários + D4Sign stub |
+| **Sprint 6** | ✅ | — | Gestão financeira: honorários, custas, repasse ao despachante externo |
+| **Sprint 7** | ✅ | — | Comunicações: WhatsApp (Z-API/Evolution) + e-mail SMTP + notificações internas |
+| **Sprint 8** | ✅ | `2255538` | Dashboard + Relatórios + exportação Excel + gestão de prazos |
+| **Sprint 9** | ✅ | `6703249` | Integrações: Google Calendar OAuth2 + ViaCEP + BrasilAPI |
+| **Sprint 10** | ✅ | `7f98902` | IA: Celery + Claude API — geração automática de documentos jurídicos |
+| **Sprint 11** | ✅ | `fb19eec` | Despachante-externo RBAC: isolamento completo por role + executor assignment |
+| **Sprint 12** | ✅ | — | Deploy VPS: docker-compose.prod, HTTPS Let's Encrypt, Nginx prod, Makefile ops |
 
 ---
 
