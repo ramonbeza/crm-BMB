@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import attendances, auth, clients, communications, financial, meetings, procedures, properties, quotes, reports, users
+from app.api.v1 import attendances, auth, clients, communications, financial, integrations, meetings, procedures, properties, quotes, reports, users
 
 router = APIRouter(prefix="/api/v1")
 
@@ -15,3 +15,4 @@ router.include_router(quotes.router, prefix="/quotes", tags=["quotes"])
 router.include_router(financial.router, prefix="/financial", tags=["financial"])
 router.include_router(communications.router, prefix="/communications", tags=["communications"])
 router.include_router(reports.router, prefix="/reports", tags=["reports"])
+router.include_router(integrations.router, prefix="/integrations", tags=["integrations"])

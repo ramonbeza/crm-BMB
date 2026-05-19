@@ -36,6 +36,7 @@ class Meeting(Base, UUIDMixin, TimestampMixin):
     subject: Mapped[str] = mapped_column(String(300), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=MeetingStatus.agendada, index=True)
+    google_event_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

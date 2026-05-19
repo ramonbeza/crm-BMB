@@ -6,7 +6,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import type { DateClickArg } from "@fullcalendar/interaction";
 import type { EventClickArg } from "@fullcalendar/core";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { X, Calendar, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Meeting, PaginatedMeetings, PaginatedClients, ReceptionType, MeetingStatus } from "@/types";
 
@@ -77,6 +77,20 @@ export function MeetingsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["meetings"] });
       setOpen(false);
+    },
+  });
+
+  const [syncMsg, setSyncMsg] = useState("");
+  const syncGoogle = useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.post(`/integrations/google/sync-meeting/${id}`);
+      return data;
+    },
+    onSuccess: (data) => {
+      setSyncMsg(`Sincronizado! Evento: ${data.html_link ?? data.google_event_id}`);
+    },
+    onError: () => {
+      setSyncMsg("Erro ao sincronizar. Verifique a integração Google Calendar em Configurações > Integrações.");
     },
   });
 
@@ -256,6 +270,17 @@ export function MeetingsPage() {
                     Excluir
                   </button>
                 )}
+                {form.id && (
+                  <button
+                    onClick={() => { setSyncMsg(""); syncGoogle.mutate(form.id!); }}
+                    disabled={syncGoogle.isPending}
+                    title="Sincronizar com Google Calendar"
+                    className="flex items-center gap-1.5 px-3 py-2 border border-blue-200 text-blue-600 rounded-lg text-sm hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    {syncGoogle.isPending ? <Loader2 size={14} className="animate-spin" /> : <Calendar size={14} />}
+                    Google
+                  </button>
+                )}
                 <button
                   onClick={() => setOpen(false)}
                   className="px-5 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
@@ -263,6 +288,11 @@ export function MeetingsPage() {
                   Cancelar
                 </button>
               </div>
+              {syncMsg && (
+                <p className={`text-xs mt-2 ${syncMsg.startsWith("Erro") ? "text-red-600" : "text-green-600"}`}>
+                  {syncMsg}
+                </p>
+              )}
             </div>
           </div>
         </div>

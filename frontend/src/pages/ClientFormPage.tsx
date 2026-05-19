@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Search, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ClientDetail } from "@/types";
 
@@ -54,6 +54,120 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 }
 
 const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500";
+
+// ── CEP lookup ────────────────────────────────────────────────────────────────
+
+interface CepResult {
+  logradouro: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+}
+
+function CepInput({ onFill }: { onFill: (res: CepResult) => void }) {
+  const [cep, setCep] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSearch = async () => {
+    const clean = cep.replace(/\D/g, "");
+    if (clean.length !== 8) { setError("CEP deve ter 8 dígitos"); return; }
+    setError("");
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/integrations/viacep/${clean}`);
+      onFill(data);
+    } catch {
+      setError("CEP não encontrado");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Buscar por CEP</label>
+      <div className="flex gap-2">
+        <input
+          value={cep}
+          onChange={(e) => setCep(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleSearch())}
+          placeholder="00000-000"
+          maxLength={9}
+          className={inputCls}
+        />
+        <button
+          type="button"
+          onClick={handleSearch}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm text-gray-700 transition-colors disabled:opacity-50 flex-shrink-0"
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+          Buscar
+        </button>
+      </div>
+      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+    </div>
+  );
+}
+
+// ── CNPJ lookup ───────────────────────────────────────────────────────────────
+
+interface CnpjResult {
+  razao_social: string;
+  nome_fantasia: string;
+  email: string;
+  telefone: string;
+  endereco: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  cep: string;
+}
+
+function CnpjLookupButton({
+  cnpj,
+  onFill,
+}: {
+  cnpj: string;
+  onFill: (res: CnpjResult) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSearch = async () => {
+    const clean = cnpj.replace(/\D/g, "");
+    if (clean.length !== 14) { setError("CNPJ deve ter 14 dígitos"); return; }
+    setError("");
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/integrations/cnpj/${clean}`);
+      onFill(data);
+    } catch {
+      setError("CNPJ não encontrado na Receita Federal");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={handleSearch}
+        disabled={loading}
+        className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-sm text-blue-700 transition-colors disabled:opacity-50 mt-6 self-start"
+      >
+        {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+        Consultar Receita Federal
+      </button>
+      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+    </div>
+  );
+}
 
 // ── page ─────────────────────────────────────────────────────────────────────
 
@@ -231,9 +345,20 @@ export function ClientFormPage() {
             </Field>
           </div>
 
-          <Field label="Endereço">
-            <input {...pfForm.register("pf_data.address")} className={inputCls} />
-          </Field>
+          {/* Busca de CEP */}
+          <div className="border-t pt-4 space-y-3">
+            <CepInput
+              onFill={(res) => {
+                const addr = [res.logradouro, res.bairro, res.cidade, res.estado]
+                  .filter(Boolean)
+                  .join(", ");
+                pfForm.setValue("pf_data.address", addr);
+              }}
+            />
+            <Field label="Endereço">
+              <input {...pfForm.register("pf_data.address")} placeholder="Rua, número, bairro, cidade - UF" className={inputCls} />
+            </Field>
+          </div>
 
           <Field label="Observações">
             <textarea {...pfForm.register("notes")} rows={3} className={inputCls} />
@@ -271,9 +396,24 @@ export function ClientFormPage() {
             <Field label="Razão Social *" error={pjForm.formState.errors.pj_data?.company_name?.message}>
               <input {...pjForm.register("pj_data.company_name")} className={inputCls} />
             </Field>
-            <Field label="CNPJ *" error={pjForm.formState.errors.pj_data?.cnpj?.message}>
-              <input {...pjForm.register("pj_data.cnpj")} placeholder="00.000.000/0000-00" className={inputCls} />
-            </Field>
+            <div className="space-y-0">
+              <Field label="CNPJ *" error={pjForm.formState.errors.pj_data?.cnpj?.message}>
+                <input
+                  {...pjForm.register("pj_data.cnpj")}
+                  placeholder="00.000.000/0000-00"
+                  className={inputCls}
+                />
+              </Field>
+              <CnpjLookupButton
+                cnpj={pjForm.watch("pj_data.cnpj") ?? ""}
+                onFill={(res) => {
+                  if (res.razao_social) pjForm.setValue("pj_data.company_name", res.razao_social);
+                  if (res.endereco) pjForm.setValue("pj_data.address", res.endereco);
+                  if (res.email) pjForm.setValue("email", res.email);
+                  if (res.telefone) pjForm.setValue("phone", res.telefone);
+                }}
+              />
+            </div>
             <Field label="Telefone *" error={pjForm.formState.errors.phone?.message}>
               <input {...pjForm.register("phone")} placeholder="(11) 99999-9999" className={inputCls} />
             </Field>
@@ -282,9 +422,20 @@ export function ClientFormPage() {
             </Field>
           </div>
 
-          <Field label="Endereço">
-            <input {...pjForm.register("pj_data.address")} className={inputCls} />
-          </Field>
+          {/* Busca de CEP */}
+          <div className="border-t pt-4 space-y-3">
+            <CepInput
+              onFill={(res) => {
+                const addr = [res.logradouro, res.bairro, res.cidade, res.estado]
+                  .filter(Boolean)
+                  .join(", ");
+                pjForm.setValue("pj_data.address", addr);
+              }}
+            />
+            <Field label="Endereço">
+              <input {...pjForm.register("pj_data.address")} placeholder="Rua, número, bairro, cidade - UF" className={inputCls} />
+            </Field>
+          </div>
 
           <Field label="Observações">
             <textarea {...pjForm.register("notes")} rows={3} className={inputCls} />

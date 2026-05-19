@@ -55,5 +55,10 @@ class Settings(BaseSettings):
     EVOLUTION_API_KEY: str = ""
     EVOLUTION_INSTANCE: str = ""
 
+    # ── Google Calendar OAuth2 ────────────────────────────────────────────────
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost/api/v1/integrations/google/callback"
+
 
 settings = Settings()
