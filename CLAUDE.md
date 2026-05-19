@@ -261,7 +261,10 @@ alembic history --verbose
 | **Sprint 9** | ✅ | `6703249` | Integrações: Google Calendar OAuth2 + ViaCEP + BrasilAPI |
 | **Sprint 10** | ✅ | `7f98902` | IA: Celery + Claude API — geração automática de documentos jurídicos |
 | **Sprint 11** | ✅ | `fb19eec` | Despachante-externo RBAC: isolamento completo por role + executor assignment |
-| **Sprint 12** | ✅ | — | Deploy VPS: docker-compose.prod, HTTPS Let's Encrypt, Nginx prod, Makefile ops |
+| **Sprint 12** | ✅ | `9b21488` | Deploy VPS: docker-compose.prod, HTTPS Let's Encrypt, Nginx prod, Makefile ops |
+| **Sprint 13** | ✅ | `bd82295` | Gestão de usuários: UsersPage, UserFormModal, CNPJ, toggle ativo/inativo |
+| **Sprint 14** | ✅ | `bd82295` | WebSocket notifications: ConnectionManager, NotificationBell, useNotificationsWS |
+| **Sprint 15** | ✅ | `46c3acb` | WS push (Redis pub/sub), Celery Beat (deadlines 08h), Audit Log append-only |
 
 ---
 
