@@ -267,6 +267,7 @@ alembic history --verbose
 | **Sprint 15** | ✅ | `46c3acb` | WS push (Redis pub/sub), Celery Beat (deadlines 08h), Audit Log append-only |
 | **Sprint 16** | ✅ | `cfb5769` | Busca global: GET /search — clientes, procedimentos, imóveis + GlobalSearch no header |
 | **Sprint 17** | ✅ | `6616546` | D4Sign: assinatura digital de orçamentos/contratos + webhook HMAC + D4SignPanel |
+| **Sprint 18** | ✅ | `e078060` | Geração de PDF: fpdf2, GET /quotes/{id}/pdf + /contratos/{id}/pdf, botão Baixar |
 
 ---
 
