@@ -1,8 +1,20 @@
 from __future__ import annotations
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+
+class ProprietarioSchema(BaseModel):
+    nome: str | None = None
+    cpf: str | None = None
+    cnpj: str | None = None
+    nacionalidade: str | None = None
+    estado_civil: str | None = None
+    regime_bens: str | None = None
+    profissao: str | None = None
+    endereco: str | None = None
 
 
 # ── ChecklistItem schemas ─────────────────────────────────────────────────────
@@ -62,6 +74,7 @@ class PropertyCreate(BaseModel):
     area_unit: str = "m2"
     cartorio: str | None = None
     confrontantes: str | None = None
+    proprietarios: list[dict[str, Any]] = Field(default_factory=list)
     notas: str | None = None
     owners: list[PropertyClientCreate] = Field(default_factory=list)
 
@@ -76,6 +89,7 @@ class PropertyUpdate(BaseModel):
     area_unit: str | None = None
     cartorio: str | None = None
     confrontantes: str | None = None
+    proprietarios: list[dict[str, Any]] | None = None
     notas: str | None = None
 
 
@@ -91,6 +105,7 @@ class PropertyRead(BaseModel):
     area_unit: str
     cartorio: str | None
     confrontantes: str | None
+    proprietarios: list[dict[str, Any]] = Field(default_factory=list)
     notas: str | None
     is_active: bool
     created_at: datetime

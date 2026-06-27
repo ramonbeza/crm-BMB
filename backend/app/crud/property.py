@@ -51,6 +51,7 @@ def _to_read(prop: Property, procedure_count: int = 0) -> dict:
         "area_unit": prop.area_unit,
         "cartorio": prop.cartorio,
         "confrontantes": prop.confrontantes,
+        "proprietarios": prop.proprietarios or [],
         "notas": prop.notas,
         "is_active": prop.is_active,
         "created_at": prop.created_at,
@@ -75,6 +76,7 @@ async def create_property(
         area_unit=obj_in.area_unit,
         cartorio=obj_in.cartorio,
         confrontantes=obj_in.confrontantes,
+        proprietarios=obj_in.proprietarios or [],
         notas=obj_in.notas,
         created_by_id=created_by_id,
     )

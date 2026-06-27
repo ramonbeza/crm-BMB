@@ -157,6 +157,7 @@ class Property(UUIDMixin, TimestampMixin, Base):
     area_unit: Mapped[str] = mapped_column(sa.String(10), nullable=False, default="m2")  # m2 | ha
     cartorio: Mapped[str | None] = mapped_column(sa.String(300), nullable=True)
     confrontantes: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    proprietarios: Mapped[list | None] = mapped_column(JSONB, nullable=True, default=list)
     notas: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=True)
     created_by_id: Mapped[str | None] = mapped_column(

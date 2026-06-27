@@ -38,8 +38,11 @@ from app.schemas.procedure import ChecklistItemRead as ProcChecklistItemRead
 router = APIRouter()
 
 
-_EXTRACT_PROMPT = """Você é um especialista em análise de matrículas de imóveis brasileiras.
-Analise este documento e extraia os seguintes dados em formato JSON puro (sem markdown):
+_EXTRACT_PROMPT = """Você é um especialista em análise de matrículas de imóveis brasileiros.
+Analise este documento integralmente e extraia os dados abaixo em formato JSON puro (sem markdown).
+
+ATENÇÃO: Para os proprietários, considere SEMPRE a averbação ou registro mais recente que transferiu a propriedade.
+Se houver múltiplas transferências, use os dados da última. Inclua a qualificação completa conforme consta na matrícula.
 
 {
   "matricula": "número da matrícula (somente o número)",
@@ -50,12 +53,25 @@ Analise este documento e extraia os seguintes dados em formato JSON puro (sem ma
   "area_total": 0.0,
   "area_unit": "m2 | ha",
   "cartorio": "nome completo do cartório de registro de imóveis",
-  "confrontantes": "confrontantes/lindeiros: Norte: ...; Sul: ...; Leste: ...; Oeste: ..."
+  "confrontantes": "confrontantes/lindeiros: Norte: ...; Sul: ...; Leste: ...; Oeste: ...",
+  "proprietarios": [
+    {
+      "nome": "nome completo",
+      "cpf": "CPF se pessoa física",
+      "cnpj": "CNPJ se pessoa jurídica",
+      "nacionalidade": "nacionalidade",
+      "estado_civil": "solteiro | casado | divorciado | viúvo | separado | união estável",
+      "regime_bens": "comunhão parcial | comunhão universal | separação total | participação final nos aquestos | null se não casado",
+      "profissao": "profissão",
+      "endereco": "endereço de qualificação do proprietário"
+    }
+  ]
 }
 
 Regras:
 - area_total deve ser um número decimal (use ponto como separador)
 - Se a área estiver em m², use area_unit "m2"; se em hectares, use "ha"
+- proprietarios deve ser uma lista; se houver casal, inclua ambos como itens separados
 - Se um campo não existir no documento, use null
 - Retorne APENAS o JSON, sem explicações"""
 

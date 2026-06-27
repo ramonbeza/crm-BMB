@@ -1,9 +1,20 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FileText, Loader2, X, Search } from "lucide-react";
+import { FileText, Loader2, X, Search, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { PaginatedProperties } from "@/types";
+
+interface Proprietario {
+  nome: string;
+  cpf: string;
+  cnpj: string;
+  nacionalidade: string;
+  estado_civil: string;
+  regime_bens: string;
+  profissao: string;
+  endereco: string;
+}
 
 interface FormState {
   matricula: string;
@@ -17,6 +28,17 @@ interface FormState {
   confrontantes: string;
   notas: string;
 }
+
+const emptyProprietario = (): Proprietario => ({
+  nome: "",
+  cpf: "",
+  cnpj: "",
+  nacionalidade: "brasileira",
+  estado_civil: "",
+  regime_bens: "",
+  profissao: "",
+  endereco: "",
+});
 
 const emptyForm = (): FormState => ({
   matricula: "",
@@ -37,10 +59,135 @@ const typeLabel: Record<string, string> = {
   rural_urbano: "Rural-Urbano",
 };
 
+function ProprietarioForm({
+  p,
+  idx,
+  onChange,
+  onRemove,
+}: {
+  p: Proprietario;
+  idx: number;
+  onChange: (idx: number, field: keyof Proprietario, val: string) => void;
+  onRemove: (idx: number) => void;
+}) {
+  const set = (field: keyof Proprietario) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    onChange(idx, field, e.target.value);
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Proprietário {idx + 1}
+        </span>
+        <button type="button" onClick={() => onRemove(idx)} className="text-gray-400 hover:text-red-500">
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Nome completo</label>
+        <input
+          value={p.nome}
+          onChange={set("nome")}
+          placeholder="Nome conforme matrícula"
+          className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">CPF</label>
+          <input
+            value={p.cpf}
+            onChange={set("cpf")}
+            placeholder="000.000.000-00"
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">CNPJ (PJ)</label>
+          <input
+            value={p.cnpj}
+            onChange={set("cnpj")}
+            placeholder="00.000.000/0000-00"
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Nacionalidade</label>
+          <input
+            value={p.nacionalidade}
+            onChange={set("nacionalidade")}
+            placeholder="brasileira"
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Profissão</label>
+          <input
+            value={p.profissao}
+            onChange={set("profissao")}
+            placeholder="advogado(a)"
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Estado civil</label>
+          <select
+            value={p.estado_civil}
+            onChange={set("estado_civil")}
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white"
+          >
+            <option value="">— Selecione —</option>
+            <option value="solteiro">Solteiro(a)</option>
+            <option value="casado">Casado(a)</option>
+            <option value="divorciado">Divorciado(a)</option>
+            <option value="viúvo">Viúvo(a)</option>
+            <option value="separado">Separado(a)</option>
+            <option value="união estável">União estável</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Regime de bens</label>
+          <select
+            value={p.regime_bens}
+            onChange={set("regime_bens")}
+            disabled={!["casado", "união estável"].includes(p.estado_civil)}
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white disabled:opacity-40"
+          >
+            <option value="">— N/A —</option>
+            <option value="comunhão parcial">Comunhão parcial</option>
+            <option value="comunhão universal">Comunhão universal</option>
+            <option value="separação total">Separação total</option>
+            <option value="participação final nos aquestos">Participação final nos aquestos</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Endereço (qualificação)</label>
+        <input
+          value={p.endereco}
+          onChange={set("endereco")}
+          placeholder="Rua, número, cidade/UF"
+          className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function PropertiesPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [proprietarios, setProprietarios] = useState<Proprietario[]>([]);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [extracting, setExtracting] = useState(false);
@@ -68,11 +215,33 @@ export function PropertiesPage() {
         confrontantes: data.confrontantes ?? "",
         notas: "",
       });
+      if (Array.isArray(data.proprietarios) && data.proprietarios.length > 0) {
+        setProprietarios(
+          data.proprietarios.map((p: Record<string, string | null>) => ({
+            nome: p.nome ?? "",
+            cpf: p.cpf ?? "",
+            cnpj: p.cnpj ?? "",
+            nacionalidade: p.nacionalidade ?? "brasileira",
+            estado_civil: p.estado_civil ?? "",
+            regime_bens: p.regime_bens ?? "",
+            profissao: p.profissao ?? "",
+            endereco: p.endereco ?? "",
+          }))
+        );
+      }
     } catch {
       setExtractError("Não foi possível extrair os dados. Verifique o documento e tente novamente.");
     } finally {
       setExtracting(false);
     }
+  };
+
+  const updateProprietario = (idx: number, field: keyof Proprietario, val: string) => {
+    setProprietarios((prev) => prev.map((p, i) => (i === idx ? { ...p, [field]: val } : p)));
+  };
+
+  const removeProprietario = (idx: number) => {
+    setProprietarios((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const { data } = useQuery({
@@ -93,6 +262,7 @@ export function PropertiesPage() {
         area_unit: f.area_unit,
         cartorio: f.cartorio || null,
         confrontantes: f.confrontantes || null,
+        proprietarios: proprietarios.filter((p) => p.nome.trim()),
         notas: f.notas || null,
         owners: [],
       };
@@ -102,6 +272,7 @@ export function PropertiesPage() {
       qc.invalidateQueries({ queryKey: ["properties"] });
       setOpen(false);
       setForm(emptyForm());
+      setProprietarios([]);
     },
   });
 
@@ -117,7 +288,7 @@ export function PropertiesPage() {
           </p>
         </div>
         <button
-          onClick={() => { setForm(emptyForm()); setExtractError(null); setOpen(true); }}
+          onClick={() => { setForm(emptyForm()); setProprietarios([]); setExtractError(null); setOpen(true); }}
           className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
         >
           Novo Imóvel
@@ -227,7 +398,7 @@ export function PropertiesPage() {
                   Preencher automaticamente com a matrícula
                 </p>
                 <p className="text-xs text-primary-600 mb-3">
-                  Faça upload do PDF ou imagem da matrícula e os campos serão preenchidos pelo Claude IA.
+                  Faça upload do PDF ou imagem da matrícula. O Claude IA irá extrair todos os dados, incluindo a qualificação dos proprietários registrais mais recentes.
                 </p>
                 <input
                   ref={fileRef}
@@ -348,6 +519,39 @@ export function PropertiesPage() {
                   onChange={(e) => setForm({ ...form, confrontantes: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
+              </div>
+
+              {/* Proprietários registrais */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Proprietários registrais
+                    <span className="ml-1 text-xs text-gray-400 font-normal">(conforme averbação mais recente)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setProprietarios((prev) => [...prev, emptyProprietario()])}
+                    className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium"
+                  >
+                    <Plus size={13} /> Adicionar
+                  </button>
+                </div>
+                {proprietarios.length === 0 && (
+                  <p className="text-xs text-gray-400 py-2">
+                    Nenhum proprietário adicionado. Use a extração por IA ou adicione manualmente.
+                  </p>
+                )}
+                <div className="space-y-3">
+                  {proprietarios.map((p, idx) => (
+                    <ProprietarioForm
+                      key={idx}
+                      p={p}
+                      idx={idx}
+                      onChange={updateProprietario}
+                      onRemove={removeProprietario}
+                    />
+                  ))}
+                </div>
               </div>
 
               <div>
