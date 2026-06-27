@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Search } from "lucide-react";
+import { FileText, Loader2, X, Search } from "lucide-react";
 import { api } from "@/lib/api";
 import type { PaginatedProperties } from "@/types";
 
@@ -43,6 +43,37 @@ export function PropertiesPage() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleExtract = async (file: File) => {
+    setExtracting(true);
+    setExtractError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await api.post("/properties/extract-matricula", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setForm({
+        matricula: data.matricula ?? "",
+        inscricao_imobiliaria: data.inscricao_imobiliaria ?? "",
+        incra_code: data.incra_code ?? "",
+        property_type: data.property_type ?? "urbano",
+        endereco: data.endereco ?? "",
+        area_total: data.area_total != null ? String(data.area_total) : "",
+        area_unit: data.area_unit ?? "m2",
+        cartorio: data.cartorio ?? "",
+        confrontantes: data.confrontantes ?? "",
+        notas: "",
+      });
+    } catch {
+      setExtractError("Não foi possível extrair os dados. Verifique o documento e tente novamente.");
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const { data } = useQuery({
     queryKey: ["properties", search],
@@ -86,7 +117,7 @@ export function PropertiesPage() {
           </p>
         </div>
         <button
-          onClick={() => { setForm(emptyForm()); setOpen(true); }}
+          onClick={() => { setForm(emptyForm()); setExtractError(null); setOpen(true); }}
           className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
         >
           Novo Imóvel
@@ -190,6 +221,33 @@ export function PropertiesPage() {
             </div>
 
             <div className="space-y-4">
+              {/* Extração automática via matrícula */}
+              <div className="rounded-lg border border-dashed border-primary-300 bg-primary-50 p-4">
+                <p className="text-sm font-medium text-primary-800 mb-1">
+                  Preencher automaticamente com a matrícula
+                </p>
+                <p className="text-xs text-primary-600 mb-3">
+                  Faça upload do PDF ou imagem da matrícula e os campos serão preenchidos pelo Claude IA.
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf,image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleExtract(f); e.target.value = ""; }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={extracting}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg"
+                >
+                  {extracting ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+                  {extracting ? "Lendo matrícula..." : "Carregar matrícula (PDF ou imagem)"}
+                </button>
+                {extractError && <p className="text-red-600 text-xs mt-2">{extractError}</p>}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de imóvel *</label>
                 <select

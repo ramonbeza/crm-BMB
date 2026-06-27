@@ -1,8 +1,14 @@
+import base64
+import json
+import re
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import anthropic
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
 
 from app.core.deps import CurrentUser, get_session
 from app.crud.property import (
@@ -30,6 +36,78 @@ from app.schemas.property import (
 from app.schemas.procedure import ChecklistItemRead as ProcChecklistItemRead
 
 router = APIRouter()
+
+
+_EXTRACT_PROMPT = """Você é um especialista em análise de matrículas de imóveis brasileiras.
+Analise este documento e extraia os seguintes dados em formato JSON puro (sem markdown):
+
+{
+  "matricula": "número da matrícula (somente o número)",
+  "inscricao_imobiliaria": "inscrição imobiliária municipal se houver",
+  "incra_code": "código INCRA se for imóvel rural",
+  "property_type": "urbano | rural | rural_urbano",
+  "endereco": "endereço completo do imóvel incluindo cidade e UF",
+  "area_total": 0.0,
+  "area_unit": "m2 | ha",
+  "cartorio": "nome completo do cartório de registro de imóveis",
+  "confrontantes": "confrontantes/lindeiros: Norte: ...; Sul: ...; Leste: ...; Oeste: ..."
+}
+
+Regras:
+- area_total deve ser um número decimal (use ponto como separador)
+- Se a área estiver em m², use area_unit "m2"; se em hectares, use "ha"
+- Se um campo não existir no documento, use null
+- Retorne APENAS o JSON, sem explicações"""
+
+
+@router.post("/extract-matricula")
+async def extract_matricula(
+    _: CurrentUser,
+    file: UploadFile = File(...),
+):
+    if not settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="Claude API não configurada.")
+
+    allowed = {"application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif"}
+    content_type = (file.content_type or "").split(";")[0].strip()
+    if content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Formato não suportado. Envie PDF, JPG ou PNG.")
+
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Arquivo muito grande (máx 20 MB).")
+
+    b64 = base64.standard_b64encode(data).decode()
+
+    if content_type == "application/pdf":
+        source_block: dict = {
+            "type": "document",
+            "source": {"type": "base64", "media_type": "application/pdf", "data": b64},
+        }
+    else:
+        source_block = {
+            "type": "image",
+            "source": {"type": "base64", "media_type": content_type, "data": b64},
+        }
+
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    message = client.messages.create(
+        model=settings.CLAUDE_MODEL,
+        max_tokens=1024,
+        messages=[{"role": "user", "content": [source_block, {"type": "text", "text": _EXTRACT_PROMPT}]}],
+    )
+
+    raw = message.content[0].text.strip()
+    # Strip markdown fences if present
+    raw = re.sub(r"^```[a-z]*\n?", "", raw)
+    raw = re.sub(r"\n?```$", "", raw)
+
+    try:
+        extracted = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="Não foi possível interpretar o documento.")
+
+    return extracted
 
 
 # ── Properties ────────────────────────────────────────────────────────────────
