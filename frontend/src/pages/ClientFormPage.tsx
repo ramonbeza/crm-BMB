@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Search, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Search } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ClientDetail } from "@/types";
 
@@ -169,6 +169,74 @@ function CnpjLookupButton({
   );
 }
 
+// ── Document extraction box ───────────────────────────────────────────────────
+
+function ExtractDocumentBox({
+  clientType,
+  onExtracted,
+}: {
+  clientType: "PF" | "PJ";
+  onExtracted: (data: Record<string, string | null>) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [docType, setDocType] = useState<string | null>(null);
+
+  const handleFile = async (file: File) => {
+    setExtracting(true);
+    setError(null);
+    setDocType(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("client_type", clientType);
+      const { data } = await api.post(
+        `/clients/extract-document?client_type=${clientType}`,
+        fd,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      setDocType(data.doc_type ?? null);
+      onExtracted(data);
+    } catch {
+      setError("Não foi possível ler o documento. Verifique a qualidade da imagem e tente novamente.");
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const hint = clientType === "PF"
+    ? "CNH, RG ou RNE (frente e verso em uma imagem ou PDF)"
+    : "Contrato Social, Estatuto ou Cartão CNPJ (PDF ou imagem)";
+
+  return (
+    <div className="rounded-lg border border-dashed border-primary-300 bg-primary-50 p-4 mb-2">
+      <p className="text-sm font-medium text-primary-800 mb-1">Preencher automaticamente com documento</p>
+      <p className="text-xs text-primary-600 mb-3">{hint}</p>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".pdf,image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+      />
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        disabled={extracting}
+        className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg"
+      >
+        {extracting ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+        {extracting ? "Lendo documento..." : "Carregar documento"}
+      </button>
+      {docType && !error && (
+        <p className="text-xs text-primary-700 mt-2 font-medium">✓ {docType} lido — campos preenchidos abaixo</p>
+      )}
+      {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
+    </div>
+  );
+}
+
 // ── page ─────────────────────────────────────────────────────────────────────
 
 export function ClientFormPage() {
@@ -315,6 +383,20 @@ export function ClientFormPage() {
           onSubmit={pfForm.handleSubmit((d) => { setSaveError(null); mutation.mutate(d); })}
           className="bg-white rounded-xl border border-gray-200 p-6 space-y-4"
         >
+          <ExtractDocumentBox
+            clientType="PF"
+            onExtracted={(d) => {
+              if (d.name) pfForm.setValue("pf_data.name", d.name);
+              if (d.cpf) pfForm.setValue("pf_data.cpf", d.cpf);
+              if (d.rg) pfForm.setValue("pf_data.rg", d.rg);
+              if (d.cnh) pfForm.setValue("pf_data.cnh", d.cnh);
+              if (d.birth_date) pfForm.setValue("pf_data.birth_date", d.birth_date);
+              if (d.civil_status) pfForm.setValue("pf_data.civil_status", d.civil_status);
+              if (d.address) pfForm.setValue("pf_data.address", d.address);
+              if (d.phone) pfForm.setValue("phone", d.phone);
+            }}
+          />
+
           <h2 className="font-semibold text-gray-700 border-b pb-2">Dados Pessoais</h2>
 
           <div className="grid grid-cols-2 gap-4">
@@ -396,6 +478,17 @@ export function ClientFormPage() {
           onSubmit={pjForm.handleSubmit((d) => { setSaveError(null); mutation.mutate(d); })}
           className="bg-white rounded-xl border border-gray-200 p-6 space-y-4"
         >
+          <ExtractDocumentBox
+            clientType="PJ"
+            onExtracted={(d) => {
+              if (d.company_name) pjForm.setValue("pj_data.company_name", d.company_name);
+              if (d.cnpj) pjForm.setValue("pj_data.cnpj", d.cnpj);
+              if (d.address) pjForm.setValue("pj_data.address", d.address);
+              if (d.phone) pjForm.setValue("phone", d.phone);
+              if (d.email) pjForm.setValue("email", d.email);
+            }}
+          />
+
           <h2 className="font-semibold text-gray-700 border-b pb-2">Dados da Empresa</h2>
 
           <div className="grid grid-cols-2 gap-4">

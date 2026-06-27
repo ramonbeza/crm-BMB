@@ -1,10 +1,15 @@
+import base64
+import json
+import re
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import anthropic
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.deps import CurrentUser, InternalOnly, get_session
 from app.crud.client import crud_client
 from app.models.client import ClientType
@@ -20,6 +25,86 @@ from app.schemas.client import (
 )
 
 router = APIRouter()
+
+_EXTRACT_PF_PROMPT = """Você é um especialista em análise de documentos de identificação brasileiros (CNH, RG, RNE).
+Analise este documento e extraia os dados em formato JSON puro (sem markdown):
+
+{
+  "doc_type": "CNH | RG | RNE | outro",
+  "name": "nome completo conforme documento",
+  "cpf": "CPF com pontos e traço: 000.000.000-00",
+  "rg": "número do RG incluindo órgão emissor se houver",
+  "cnh": "número da CNH se for CNH",
+  "birth_date": "data de nascimento no formato YYYY-MM-DD",
+  "civil_status": "solteiro | casado | divorciado | viúvo | separado | união estável | null",
+  "address": "endereço completo conforme documento se houver",
+  "phone": null
+}
+
+Regras:
+- Se não houver o campo no documento, use null
+- Retorne APENAS o JSON, sem explicações"""
+
+_EXTRACT_PJ_PROMPT = """Você é um especialista em análise de contratos sociais, estatutos e documentos empresariais brasileiros.
+Analise este documento e extraia os dados em formato JSON puro (sem markdown):
+
+{
+  "doc_type": "Contrato Social | Estatuto | CNPJ | Certidão | outro",
+  "company_name": "razão social completa",
+  "cnpj": "CNPJ com pontos, barra e traço: 00.000.000/0000-00",
+  "address": "endereço completo da sede",
+  "phone": "telefone se houver",
+  "email": "e-mail se houver"
+}
+
+Regras:
+- Se não houver o campo no documento, use null
+- Retorne APENAS o JSON, sem explicações"""
+
+
+@router.post("/extract-document")
+async def extract_document(
+    _: CurrentUser,
+    client_type: str = "PF",
+    file: UploadFile = File(...),
+):
+    if not settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="Claude API não configurada.")
+
+    allowed = {"application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif"}
+    content_type = (file.content_type or "").split(";")[0].strip()
+    if content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Formato não suportado. Envie PDF, JPG ou PNG.")
+
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Arquivo muito grande (máx 20 MB).")
+
+    b64 = base64.standard_b64encode(data).decode()
+    if content_type == "application/pdf":
+        source_block: dict = {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": b64}}
+    else:
+        source_block = {"type": "image", "source": {"type": "base64", "media_type": content_type, "data": b64}}
+
+    prompt = _EXTRACT_PF_PROMPT if client_type.upper() == "PF" else _EXTRACT_PJ_PROMPT
+
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    message = client.messages.create(
+        model=settings.CLAUDE_MODEL,
+        max_tokens=1024,
+        messages=[{"role": "user", "content": [source_block, {"type": "text", "text": prompt}]}],
+    )
+
+    raw = message.content[0].text.strip()
+    raw = re.sub(r"^```[a-z]*\n?", "", raw)
+    raw = re.sub(r"\n?```$", "", raw)
+
+    try:
+        extracted = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="Não foi possível interpretar o documento.")
+
+    return extracted
 
 
 def _can_delete(user) -> bool:
