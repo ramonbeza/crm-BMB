@@ -58,9 +58,24 @@ export function Sidebar() {
 
   return (
     <aside className="w-60 flex flex-col bg-primary-900 text-white flex-shrink-0">
-      <div className="px-5 py-5 border-b border-primary-700">
-        <p className="text-xs font-semibold uppercase tracking-widest text-primary-300">CRM</p>
-        <h1 className="text-sm font-bold leading-tight mt-0.5">Beza, Miranda e Bonetti</h1>
+      <div className="px-4 py-4 border-b border-primary-700 space-y-3">
+        <img
+          src="/logo-beza.png"
+          alt="Beza, Miranda e Bonetti Advogados"
+          className="h-14 w-auto object-contain"
+        />
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-px bg-primary-600" />
+          <span className="text-[9px] text-primary-400 uppercase tracking-widest">Parceria</span>
+          <div className="flex-1 h-px bg-primary-600" />
+        </div>
+        <div className="bg-white rounded px-2 py-1.5">
+          <img
+            src="/logo-agilis.png"
+            alt="Ágilis Despachante Imobiliário"
+            className="h-7 w-auto object-contain"
+          />
+        </div>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
