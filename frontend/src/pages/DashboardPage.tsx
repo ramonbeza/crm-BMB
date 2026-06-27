@@ -173,12 +173,17 @@ export function DashboardPage() {
 
   const maxTipo = Math.max(...(data.procedimentos.por_tipo.map((t) => t.total) || [1]), 1);
 
+  const hour = new Date().getHours();
+  const greeting =
+    hour >= 5 && hour < 12 ? "Bom dia" :
+    hour >= 12 && hour < 18 ? "Boa tarde" : "Boa noite";
+
   return (
     <div className="space-y-6">
       {/* Greeting */}
       <div>
         <h1 className="text-xl font-bold text-gray-900">
-          Bom dia, {user?.name?.split(" ")[0]} 👋
+          {greeting}, {user?.name?.split(" ")[0]} 👋
         </h1>
         <p className="text-sm text-gray-500 mt-0.5">
           {roleLabel[user?.role ?? ""] ?? user?.role} ·{" "}

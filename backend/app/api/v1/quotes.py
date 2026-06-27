@@ -38,9 +38,9 @@ from app.schemas.quote import (
 router = APIRouter()
 
 
-# ── Quotes ────────────────────────────────────────────────────────────────────
+# ── Quotes — listagem e criação ───────────────────────────────────────────────
 
-@router.get("/", response_model=PaginatedQuotes)
+@router.get("", response_model=PaginatedQuotes)
 async def list_quotes_ep(
     _: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -56,7 +56,7 @@ async def list_quotes_ep(
     )
 
 
-@router.post("/", response_model=QuoteRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=QuoteRead, status_code=status.HTTP_201_CREATED)
 async def create_quote_ep(
     body: QuoteCreate,
     current_user: CurrentUser,
@@ -65,47 +65,9 @@ async def create_quote_ep(
     return await create_quote(db, obj_in=body, created_by_id=current_user.id)
 
 
-@router.get("/{quote_id}", response_model=QuoteRead)
-async def get_quote_ep(
-    quote_id: UUID,
-    _: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_session)],
-):
-    q = await get_quote(db, quote_id)
-    if not q:
-        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
-    from app.crud.quote import _quote_to_read
-    return _quote_to_read(q)
+# ── Contracts — ANTES das rotas dinâmicas /{quote_id} ────────────────────────
 
-
-@router.put("/{quote_id}", response_model=QuoteRead)
-async def update_quote_ep(
-    quote_id: UUID,
-    body: QuoteUpdate,
-    _: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_session)],
-):
-    q = await get_quote(db, quote_id)
-    if not q:
-        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
-    return await update_quote(db, db_obj=q, obj_in=body)
-
-
-@router.post("/{quote_id}/nova-versao", response_model=QuoteRead, status_code=status.HTTP_201_CREATED)
-async def new_version_ep(
-    quote_id: UUID,
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_session)],
-):
-    q = await get_quote(db, quote_id)
-    if not q:
-        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
-    return await new_version(db, original=q, created_by_id=current_user.id)
-
-
-# ── Contracts ─────────────────────────────────────────────────────────────────
-
-@router.get("/contratos/", response_model=PaginatedContracts)
+@router.get("/contratos", response_model=PaginatedContracts)
 async def list_contracts_ep(
     _: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -120,13 +82,46 @@ async def list_contracts_ep(
     )
 
 
-@router.post("/contratos/", response_model=ContractRead, status_code=status.HTTP_201_CREATED)
+@router.post("/contratos", response_model=ContractRead, status_code=status.HTTP_201_CREATED)
 async def create_contract_ep(
     body: ContractCreate,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     return await create_contract(db, obj_in=body, created_by_id=current_user.id)
+
+
+@router.get("/contratos/{contract_id}/pdf", summary="Baixar contrato em PDF")
+async def download_contract_pdf(
+    contract_id: UUID,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    c_orm = await get_contract(db, contract_id)
+    if not c_orm:
+        raise HTTPException(status_code=404, detail="Contrato não encontrado")
+    c = _contract_to_read(c_orm)
+
+    pdf_bytes = generate_contract_pdf(
+        formatted_number=c.formatted_number,
+        client_name=c.client_name or "—",
+        payment_model_label=c.payment_model_label,
+        total_value=float(c.total_value),
+        installments=[
+            {"due_date": inst.due_date, "value": float(inst.value), "status": inst.status}
+            for inst in c.installments
+        ],
+        exito_percentual=float(c.exito_percentual) if c.exito_percentual else None,
+        notas=c.notas,
+        status_label=c.status_label,
+        quote_number=None,
+    )
+    filename = f"{c.formatted_number.replace('/', '-')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/contratos/{contract_id}", response_model=ContractRead)
@@ -138,7 +133,6 @@ async def get_contract_ep(
     c = await get_contract(db, contract_id)
     if not c:
         raise HTTPException(status_code=404, detail="Contrato não encontrado")
-    from app.crud.quote import _contract_to_read
     return _contract_to_read(c)
 
 
@@ -155,9 +149,9 @@ async def update_contract_ep(
     return await update_contract(db, db_obj=c, obj_in=body)
 
 
-# ── Price table ───────────────────────────────────────────────────────────────
+# ── Price table — ANTES das rotas dinâmicas /{quote_id} ──────────────────────
 
-@router.get("/tabela-precos/", response_model=list[PriceTableRead])
+@router.get("/tabela-precos", response_model=list[PriceTableRead])
 async def get_price_table_ep(
     _: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -175,7 +169,7 @@ async def upsert_price_ep(
     return await upsert_price_entry(db, procedure_type=procedure_type, obj_in=body)
 
 
-# ── PDF download ───────────────────────────────────────────────────────────────
+# ── Quote PDF — ANTES de /{quote_id} ─────────────────────────────────────────
 
 @router.get("/{quote_id}/pdf", summary="Baixar orçamento em PDF")
 async def download_quote_pdf(
@@ -210,34 +204,40 @@ async def download_quote_pdf(
     )
 
 
-@router.get("/contratos/{contract_id}/pdf", summary="Baixar contrato em PDF")
-async def download_contract_pdf(
-    contract_id: UUID,
+# ── Quote CRUD dinâmico — DEPOIS de todos os paths fixos ─────────────────────
+
+@router.get("/{quote_id}", response_model=QuoteRead)
+async def get_quote_ep(
+    quote_id: UUID,
     _: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
-) -> Response:
-    c_orm = await get_contract(db, contract_id)
-    if not c_orm:
-        raise HTTPException(status_code=404, detail="Contrato não encontrado")
-    c = _contract_to_read(c_orm)
+):
+    q = await get_quote(db, quote_id)
+    if not q:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    return _quote_to_read(q)
 
-    pdf_bytes = generate_contract_pdf(
-        formatted_number=c.formatted_number,
-        client_name=c.client_name or "—",
-        payment_model_label=c.payment_model_label,
-        total_value=float(c.total_value),
-        installments=[
-            {"due_date": inst.due_date, "value": float(inst.value), "status": inst.status}
-            for inst in c.installments
-        ],
-        exito_percentual=float(c.exito_percentual) if c.exito_percentual else None,
-        notas=c.notas,
-        status_label=c.status_label,
-        quote_number=None,
-    )
-    filename = f"{c.formatted_number.replace('/', '-')}.pdf"
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+
+@router.put("/{quote_id}", response_model=QuoteRead)
+async def update_quote_ep(
+    quote_id: UUID,
+    body: QuoteUpdate,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    q = await get_quote(db, quote_id)
+    if not q:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    return await update_quote(db, db_obj=q, obj_in=body)
+
+
+@router.post("/{quote_id}/nova-versao", response_model=QuoteRead, status_code=status.HTTP_201_CREATED)
+async def new_version_ep(
+    quote_id: UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    q = await get_quote(db, quote_id)
+    if not q:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+    return await new_version(db, original=q, created_by_id=current_user.id)

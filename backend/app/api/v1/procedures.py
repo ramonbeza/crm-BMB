@@ -29,7 +29,7 @@ async def list_procedure_types(_: CurrentUser):
     return [ProcedureTypeOption(value=k, label=v) for k, v in PROCEDURE_TYPE_LABELS.items()]
 
 
-@router.get("/", response_model=PaginatedProcedures)
+@router.get("", response_model=PaginatedProcedures)
 async def list_procedures(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -40,6 +40,7 @@ async def list_procedures(
     client_id: UUID | None = Query(None),
     responsible_user_id: UUID | None = Query(None),
     tag: str | None = Query(None),
+    property_id: UUID | None = Query(None),
 ):
     # Despachante-externo só vê procedimentos onde é executor
     executor_id: UUID | None = None
@@ -50,11 +51,11 @@ async def list_procedures(
         db, page=page, page_size=page_size,
         procedure_type=procedure_type, status=status_filter,
         client_id=client_id, responsible_user_id=responsible_user_id,
-        tag=tag, executor_user_id=executor_id,
+        tag=tag, executor_user_id=executor_id, property_id=property_id,
     )
 
 
-@router.post("/", response_model=ProcedureRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ProcedureRead, status_code=status.HTTP_201_CREATED)
 async def create_procedure(
     request: Request,
     body: ProcedureCreate,

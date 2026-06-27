@@ -135,7 +135,7 @@ function SendModal({
 
   const mutation = useMutation({
     mutationFn: async () =>
-      api.post("/communications/", {
+      api.post("/communications", {
         channel: form.channel,
         recipient_name: form.recipient_name || null,
         recipient_phone: form.recipient_phone || null,
@@ -340,7 +340,7 @@ function TemplateForm({
 
   const mutation = useMutation({
     mutationFn: async () =>
-      api.post("/communications/templates/", { name, channel, subject: subject || null, body, variables }),
+      api.post("/communications/templates", { name, channel, subject: subject || null, body, variables }),
     onSuccess: () => {
       onSaved();
       onClose();
@@ -488,10 +488,11 @@ export function ComunicacoesPage() {
   const [filterChannel, setFilterChannel] = useState("");
   const [showSend, setShowSend] = useState(false);
   const [showNewTemplate, setShowNewTemplate] = useState(false);
+  const [confirmDeleteTemplateId, setConfirmDeleteTemplateId] = useState<string | null>(null);
 
   const { data: templates = [] } = useQuery<TemplateRead[]>({
     queryKey: ["templates"],
-    queryFn: async () => (await api.get<TemplateRead[]>("/communications/templates/")).data,
+    queryFn: async () => (await api.get<TemplateRead[]>("/communications/templates")).data,
   });
 
   const { data: history, isLoading } = useQuery<PaginatedComms>({
@@ -499,7 +500,7 @@ export function ComunicacoesPage() {
     queryFn: async () => {
       const params: Record<string, string | number> = { page, page_size: 20 };
       if (filterChannel) params.channel = filterChannel;
-      return (await api.get<PaginatedComms>("/communications/", { params })).data;
+      return (await api.get<PaginatedComms>("/communications", { params })).data;
     },
     enabled: tab === "historico",
   });
@@ -682,7 +683,7 @@ export function ComunicacoesPage() {
                       )}
                     </div>
                     <button
-                      onClick={() => deleteTemplate.mutate(t.id)}
+                      onClick={() => setConfirmDeleteTemplateId(t.id)}
                       disabled={deleteTemplate.isPending}
                       className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 flex-shrink-0 transition-opacity"
                     >
@@ -711,6 +712,31 @@ export function ComunicacoesPage() {
           onClose={() => setShowNewTemplate(false)}
           onSaved={() => qc.invalidateQueries({ queryKey: ["templates"] })}
         />
+      )}
+
+      {/* Confirm deactivate template */}
+      {confirmDeleteTemplateId && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+            <p className="text-base font-semibold text-gray-900 mb-2">Desativar template?</p>
+            <p className="text-sm text-gray-500 mb-5">O template será desativado e não aparecerá mais na lista de envio.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDeleteTemplateId(null)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { deleteTemplate.mutate(confirmDeleteTemplateId); setConfirmDeleteTemplateId(null); }}
+                disabled={deleteTemplate.isPending}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50"
+              >
+                Desativar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -98,6 +98,7 @@ export interface Meeting {
   updated_at: string;
   client_name: string | null;
   user_name: string | null;
+  google_event_id: string | null;
 }
 
 export interface PaginatedMeetings {

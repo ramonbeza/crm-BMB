@@ -33,8 +33,9 @@ export function AttendancesPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [clientSearch, setClientSearch] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const endpoint = tab === "pending" ? "/attendances/pending-procedures" : "/attendances/";
+  const endpoint = tab === "pending" ? "/attendances/pending-procedures" : "/attendances";
   const { data } = useQuery({
     queryKey: ["attendances", tab],
     queryFn: async () => (await api.get<PaginatedAttendances>(`${endpoint}?page_size=100`)).data,
@@ -64,11 +65,16 @@ export function AttendancesPage() {
         converted_to_procedure: f.converted_to_procedure,
       };
       if (f.id) return (await api.put(`/attendances/${f.id}`, payload)).data;
-      return (await api.post("/attendances/", payload)).data;
+      return (await api.post("/attendances", payload)).data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["attendances"] });
+      setSaveError(null);
       setOpen(false);
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setSaveError(detail ?? "Erro ao salvar. Verifique os campos obrigatórios.");
     },
   });
 
@@ -81,9 +87,11 @@ export function AttendancesPage() {
   const openNew = () => {
     setForm(emptyForm());
     setClientSearch("");
+    setSaveError(null);
     setOpen(true);
   };
   const openEdit = (a: Attendance) => {
+    setSaveError(null);
     setForm({
       id: a.id,
       client_id: a.client_id,
@@ -262,13 +270,17 @@ export function AttendancesPage() {
                 Já convertido em procedimento
               </label>
 
-              {save.isError && (
-                <p className="text-red-600 text-sm">Erro ao salvar. Selecione um cliente.</p>
+              {saveError && (
+                <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
               )}
 
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={() => save.mutate(form)}
+                  onClick={() => {
+                    const hasContent = form.decisions.trim() || form.pending_items.trim();
+                    if (!hasContent && !window.confirm("Este atendimento não tem decisões nem itens pendentes registrados. Deseja salvar mesmo assim?")) return;
+                    save.mutate(form);
+                  }}
                   disabled={save.isPending || !form.client_id}
                   className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 py-2 rounded-lg text-sm"
                 >

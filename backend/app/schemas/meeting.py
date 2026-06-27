@@ -37,6 +37,7 @@ class MeetingRead(MeetingBase):
     # Campos display para a UI
     client_name: str | None = None
     user_name: str | None = None
+    google_event_id: str | None = None
 
     model_config = {"from_attributes": True}
 

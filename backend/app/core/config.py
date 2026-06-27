@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     CLAUDE_MODEL: str = "claude-sonnet-4-5"
 
+    # ── Frontend URL (para CORS no Railway) ──────────────────────────────────
+    FRONTEND_URL: str = "http://localhost"
+
     # ── D4Sign ────────────────────────────────────────────────────────────────
     D4SIGN_TOKEN_API: str = ""        # token de acesso à API
     D4SIGN_CRYPT_KEY: str = ""        # chave de criptografia do cofre

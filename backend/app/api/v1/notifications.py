@@ -44,7 +44,7 @@ class NotificationRead(BaseModel):
 
 # ── REST ──────────────────────────────────────────────────────────────────────
 
-@router.get("/", response_model=list[NotificationRead])
+@router.get("", response_model=list[NotificationRead])
 async def list_notifications(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],

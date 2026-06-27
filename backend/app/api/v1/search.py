@@ -89,7 +89,7 @@ def _client_name(proc: Procedure) -> str:
 
 # ── Endpoint ───────────────────────────────────────────────────────────────────
 
-@router.get("/", response_model=SearchResponse)
+@router.get("", response_model=SearchResponse)
 async def global_search(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],

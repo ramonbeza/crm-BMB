@@ -12,7 +12,7 @@ from app.schemas.meeting import MeetingCreate, MeetingRead, MeetingUpdate, Pagin
 router = APIRouter()
 
 
-@router.get("/", response_model=PaginatedMeetings)
+@router.get("", response_model=PaginatedMeetings)
 async def list_meetings(
     _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -29,7 +29,7 @@ async def list_meetings(
     )
 
 
-@router.post("/", response_model=MeetingRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=MeetingRead, status_code=status.HTTP_201_CREATED)
 async def create_meeting(
     body: MeetingCreate,
     current_user: InternalOnly,

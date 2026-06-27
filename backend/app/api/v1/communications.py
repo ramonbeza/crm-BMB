@@ -101,7 +101,7 @@ async def render_template(
 
 # ── Communications (envio) ────────────────────────────────────────────────────
 
-@router.get("/", response_model=PaginatedComms)
+@router.get("", response_model=PaginatedComms)
 async def list_comms(
     _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -121,7 +121,7 @@ async def list_comms(
     )
 
 
-@router.post("/", response_model=CommRead, status_code=201)
+@router.post("", response_model=CommRead, status_code=201)
 async def send_message(
     body: CommCreate,
     current_user: InternalOnly,

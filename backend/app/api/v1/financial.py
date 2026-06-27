@@ -46,7 +46,7 @@ async def get_procedure_summary(
 
 # ── CRUD de entradas ──────────────────────────────────────────────────────────
 
-@router.get("/", response_model=PaginatedFinancialEntries)
+@router.get("", response_model=PaginatedFinancialEntries)
 async def list_entries(
     _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -70,7 +70,7 @@ async def list_entries(
     )
 
 
-@router.post("/", response_model=FinancialEntryRead, status_code=201)
+@router.post("", response_model=FinancialEntryRead, status_code=201)
 async def create_entry(
     body: FinancialEntryCreate,
     current_user: InternalOnly,

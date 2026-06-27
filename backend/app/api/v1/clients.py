@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import CurrentUser, InternalOnly, get_session
@@ -25,7 +26,7 @@ def _can_delete(user) -> bool:
     return user.role in (UserRole.admin, UserRole.advogado)
 
 
-@router.get("/", response_model=PaginatedClients)
+@router.get("", response_model=PaginatedClients)
 async def list_clients(
     _: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -51,7 +52,13 @@ async def create_client_pf(
     current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
-    return await crud_client.create_pf(db, obj_in=body, created_by_id=current_user.id)
+    try:
+        return await crud_client.create_pf(db, obj_in=body, created_by_id=current_user.id)
+    except IntegrityError as exc:
+        await db.rollback()
+        if "cpf" in str(exc.orig).lower():
+            raise HTTPException(status_code=409, detail="Já existe um cliente cadastrado com este CPF.")
+        raise HTTPException(status_code=409, detail="Dados duplicados. Verifique as informações.")
 
 
 @router.post("/pj", response_model=ClientPJRead, status_code=status.HTTP_201_CREATED)
@@ -60,7 +67,13 @@ async def create_client_pj(
     current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
-    return await crud_client.create_pj(db, obj_in=body, created_by_id=current_user.id)
+    try:
+        return await crud_client.create_pj(db, obj_in=body, created_by_id=current_user.id)
+    except IntegrityError as exc:
+        await db.rollback()
+        if "cnpj" in str(exc.orig).lower():
+            raise HTTPException(status_code=409, detail="Já existe um cliente cadastrado com este CNPJ.")
+        raise HTTPException(status_code=409, detail="Dados duplicados. Verifique as informações.")
 
 
 @router.get("/{client_id}", response_model=ClientPFRead | ClientPJRead)

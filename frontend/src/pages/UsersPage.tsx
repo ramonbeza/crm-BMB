@@ -89,6 +89,9 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
 
   const save = useMutation({
     mutationFn: async () => {
+      if (form.password && form.password.length < 6) {
+        throw new Error("A senha deve ter pelo menos 6 caracteres.");
+      }
       const payload: Record<string, unknown> = {
         name: form.name,
         email: form.email,
@@ -103,7 +106,7 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
         return (await api.put(`/users/${user.id}`, payload)).data;
       } else {
         if (!form.password) throw new Error("Senha é obrigatória para novos usuários.");
-        return (await api.post("/users/", payload)).data;
+        return (await api.post("/users", payload)).data;
       }
     },
     onSuccess: () => {
@@ -203,7 +206,7 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
                 type={showPass ? "text" : "password"}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder={isEdit ? "••••••••" : "mínimo 8 caracteres"}
+                placeholder={isEdit ? "••••••••" : "mínimo 6 caracteres"}
                 className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
               <button
@@ -214,6 +217,9 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {form.password.length > 0 && form.password.length < 6 && (
+              <p className="mt-1 text-xs text-red-600">Mínimo 6 caracteres</p>
+            )}
           </div>
         </div>
 
@@ -227,7 +233,7 @@ function UserFormModal({ user, onClose }: UserFormModalProps) {
           </button>
           <button
             onClick={() => save.mutate()}
-            disabled={save.isPending}
+            disabled={save.isPending || (form.password.length > 0 && form.password.length < 6)}
             className="px-4 py-2 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50"
           >
             {save.isPending ? "Salvando..." : isEdit ? "Salvar alterações" : "Criar usuário"}
@@ -244,10 +250,11 @@ export function UsersPage() {
   const { user: me } = useAuthStore();
   const qc = useQueryClient();
   const [modal, setModal] = useState<User | null | "new">(null);
+  const [confirmDeactivateId, setConfirmDeactivateId] = useState<string | null>(null);
 
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["users"],
-    queryFn: async () => (await api.get<User[]>("/users/?include_inactive=true")).data,
+    queryFn: async () => (await api.get<User[]>("/users?include_inactive=true")).data,
   });
 
   const toggleActive = useMutation({
@@ -374,7 +381,13 @@ export function UsersPage() {
                         </button>
                         {u.id !== me?.id && (
                           <button
-                            onClick={() => toggleActive.mutate(u)}
+                            onClick={() => {
+                              if (u.is_active) {
+                                setConfirmDeactivateId(u.id);
+                              } else {
+                                toggleActive.mutate(u);
+                              }
+                            }}
                             disabled={toggleActive.isPending}
                             className={`p-1.5 rounded transition-colors ${
                               u.is_active
@@ -411,6 +424,34 @@ export function UsersPage() {
           );
         })}
       </div>
+
+      {/* Confirmação de desativação */}
+      {confirmDeactivateId && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+            <p className="text-base font-semibold text-gray-900 mb-2">Desativar usuário?</p>
+            <p className="text-sm text-gray-500 mb-6">O usuário perderá o acesso ao sistema. Esta ação pode ser revertida.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDeactivateId(null)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const u = users.find((u) => u.id === confirmDeactivateId);
+                  if (u) toggleActive.mutate(u);
+                  setConfirmDeactivateId(null);
+                }}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {modal !== null && (

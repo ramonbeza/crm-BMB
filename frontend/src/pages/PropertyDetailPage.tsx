@@ -38,7 +38,7 @@ export function PropertyDetailPage() {
   const { data: procedures } = useQuery<PaginatedProcedures>({
     queryKey: ["procedures-by-property", id],
     queryFn: async () =>
-      (await api.get<PaginatedProcedures>(`/procedures/?page_size=100&property_id=${id}`)).data,
+      (await api.get<PaginatedProcedures>(`/procedures?page_size=100&property_id=${id}`)).data,
     enabled: !!id,
   });
 

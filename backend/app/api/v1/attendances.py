@@ -18,7 +18,7 @@ from app.schemas.attendance import (
 router = APIRouter()
 
 
-@router.get("/", response_model=PaginatedAttendances)
+@router.get("", response_model=PaginatedAttendances)
 async def list_attendances(
     _: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -40,7 +40,7 @@ async def list_pending_procedures(
     return await crud_attendance.list_paginated(db, page=page, page_size=page_size, pending_only=True)
 
 
-@router.post("/", response_model=AttendanceRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=AttendanceRead, status_code=status.HTTP_201_CREATED)
 async def create_attendance(
     body: AttendanceCreate,
     current_user: InternalOnly,

@@ -189,7 +189,7 @@ export function ProcedureDetailPage() {
   const { data: despachantes } = useQuery<UserType[]>({
     queryKey: ["users-despachantes"],
     queryFn: async () => {
-      const res = await api.get<UserType[]>("/users/");
+      const res = await api.get<UserType[]>("/users");
       return res.data.filter((u) => u.role === "despachante_externo");
     },
     enabled: isInternal,
@@ -561,6 +561,8 @@ const tipoBadge: Record<string, string> = {
 function FinancialPanel({ procedureId }: { procedureId: string }) {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [confirmPayId, setConfirmPayId] = useState<string | null>(null);
   const [form, setForm] = useState({
     tipo: "custa_real" as EntryTipo,
     category: "cartorio" as EntryCategory,
@@ -581,14 +583,14 @@ function FinancialPanel({ procedureId }: { procedureId: string }) {
   const { data: entries } = useQuery<PaginatedFinancialEntries>({
     queryKey: ["financial-entries-proc", procedureId],
     queryFn: async () =>
-      (await api.get<PaginatedFinancialEntries>("/financial/", {
+      (await api.get<PaginatedFinancialEntries>("/financial", {
         params: { procedure_id: procedureId, page_size: 50 },
       })).data,
   });
 
   const createMutation = useMutation({
     mutationFn: async () =>
-      api.post("/financial/", {
+      api.post("/financial", {
         procedure_id: procedureId,
         tipo: form.tipo,
         category: form.category,
@@ -603,7 +605,12 @@ function FinancialPanel({ procedureId }: { procedureId: string }) {
       qc.invalidateQueries({ queryKey: ["financial-summary", procedureId] });
       qc.invalidateQueries({ queryKey: ["financial-dashboard"] });
       setShowCreate(false);
+      setCreateError(null);
       setForm({ tipo: "custa_real", category: "cartorio", description: "", value: "", status: "pendente", due_date: "", notas: "" });
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setCreateError(detail ?? "Erro ao salvar o lançamento.");
     },
   });
 
@@ -612,6 +619,8 @@ function FinancialPanel({ procedureId }: { procedureId: string }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["financial-entries-proc", procedureId] });
       qc.invalidateQueries({ queryKey: ["financial-summary", procedureId] });
+      qc.invalidateQueries({ queryKey: ["financial-dashboard"] });
+      setConfirmPayId(null);
     },
   });
 
@@ -731,6 +740,9 @@ function FinancialPanel({ procedureId }: { procedureId: string }) {
             />
           </div>
 
+          {createError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{createError}</p>
+          )}
           <div className="flex gap-2">
             <button
               onClick={() => createMutation.mutate()}
@@ -740,7 +752,7 @@ function FinancialPanel({ procedureId }: { procedureId: string }) {
               {createMutation.isPending ? "Salvando..." : "Salvar"}
             </button>
             <button
-              onClick={() => setShowCreate(false)}
+              onClick={() => { setShowCreate(false); setCreateError(null); }}
               className="px-3 py-1.5 border border-gray-200 text-xs text-gray-600 rounded"
             >
               Cancelar
@@ -773,7 +785,7 @@ function FinancialPanel({ procedureId }: { procedureId: string }) {
               )}
               {entry.status === "pendente" && (
                 <button
-                  onClick={() => payMutation.mutate(entry.id)}
+                  onClick={() => setConfirmPayId(entry.id)}
                   disabled={payMutation.isPending}
                   className="text-xs text-green-600 hover:text-green-800 disabled:opacity-40"
                   title="Marcar como pago"
@@ -783,6 +795,31 @@ function FinancialPanel({ procedureId }: { procedureId: string }) {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Confirm pay modal */}
+      {confirmPayId && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+            <p className="text-base font-semibold text-gray-900 mb-2">Confirmar pagamento?</p>
+            <p className="text-sm text-gray-500 mb-5">Esta ação marcará o lançamento como pago e não pode ser desfeita.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmPayId(null)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => payMutation.mutate(confirmPayId)}
+                disabled={payMutation.isPending}
+                className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+              >
+                {payMutation.isPending ? "Salvando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

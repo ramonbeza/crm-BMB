@@ -2,8 +2,13 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-# npm install (não npm ci) — não há package-lock.json versionado; install gera e resolve
 RUN npm install
+
+# Variáveis injetadas em build-time pelo Railway
+ARG VITE_API_URL
+ARG VITE_WS_URL
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
 
 COPY . .
 RUN npm run build
@@ -14,4 +19,4 @@ RUN npm install -g serve
 COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["sh", "-c", "serve -s dist -l ${PORT:-3000}"]

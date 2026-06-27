@@ -1,10 +1,21 @@
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, BeforeValidator, EmailStr, field_validator
 
 from app.models.client import ClientType
+
+
+def _empty_str_to_none(v: object) -> object:
+    """Converte string vazia para None (útil para campos opcionais vindos do frontend)."""
+    if isinstance(v, str) and v.strip() == "":
+        return None
+    return v
+
+
+OptionalEmail = Annotated[EmailStr | None, BeforeValidator(_empty_str_to_none)]
+OptionalStr = Annotated[str | None, BeforeValidator(_empty_str_to_none)]
 
 
 # ── PF ────────────────────────────────────────────────────────────────────────
@@ -13,10 +24,10 @@ class ClientPFData(BaseModel):
     name: str
     cpf: str
     birth_date: date | None = None
-    civil_status: str | None = None
-    rg: str | None = None
-    cnh: str | None = None
-    address: str | None = None
+    civil_status: OptionalStr = None
+    rg: OptionalStr = None
+    cnh: OptionalStr = None
+    address: OptionalStr = None
 
     @field_validator("cpf")
     @classmethod
@@ -29,16 +40,16 @@ class ClientPFData(BaseModel):
 
 class ClientPFCreate(BaseModel):
     client_type: Literal[ClientType.PF] = ClientType.PF
-    phone: str
-    email: EmailStr | None = None
-    notes: str | None = None
+    phone: str = ""
+    email: OptionalEmail = None
+    notes: OptionalStr = None
     pf_data: ClientPFData
 
 
 class ClientPFUpdate(BaseModel):
     phone: str | None = None
-    email: EmailStr | None = None
-    notes: str | None = None
+    email: OptionalEmail = None
+    notes: OptionalStr = None
     pf_data: ClientPFData | None = None
 
 
@@ -74,16 +85,16 @@ class ClientPJData(BaseModel):
 
 class ClientPJCreate(BaseModel):
     client_type: Literal[ClientType.PJ] = ClientType.PJ
-    phone: str
-    email: EmailStr | None = None
-    notes: str | None = None
+    phone: str = ""
+    email: OptionalEmail = None
+    notes: OptionalStr = None
     pj_data: ClientPJData
 
 
 class ClientPJUpdate(BaseModel):
     phone: str | None = None
-    email: EmailStr | None = None
-    notes: str | None = None
+    email: OptionalEmail = None
+    notes: OptionalStr = None
     pj_data: ClientPJData | None = None
 
 

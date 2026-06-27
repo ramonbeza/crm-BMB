@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Annotated, Any
 
 import httpx
+import redis.asyncio as aioredis
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
@@ -20,9 +21,14 @@ from googleapiclient.discovery import build
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.deps import InternalOnly
+from app.core.deps import AdminOnly, InternalOnly
 from app.db.session import get_session
 from app.models.integration import GoogleCalendarToken
+from app.models.user import User, UserRole
+
+# Redis para armazenar o code_verifier PKCE temporariamente
+def _get_redis() -> aioredis.Redis:
+    return aioredis.from_url(settings.REDIS_URL, decode_responses=True)
 
 router = APIRouter()
 
@@ -75,6 +81,12 @@ async def google_auth_url(current_user: InternalOnly) -> dict[str, str]:
         state=str(current_user.id),
         prompt="consent",
     )
+    # Salva o code_verifier no Redis por 10 minutos (necessário para PKCE)
+    code_verifier = getattr(flow.oauth2session, "_code_verifier", None)
+    if code_verifier:
+        r = _get_redis()
+        await r.set(f"pkce:{current_user.id}", code_verifier, ex=600)
+        await r.aclose()
     return {"auth_url": auth_url}
 
 
@@ -88,9 +100,18 @@ async def google_callback(
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=503, detail="Google Calendar não configurado.")
 
+    # Recupera o code_verifier PKCE do Redis
+    r = _get_redis()
+    code_verifier = await r.get(f"pkce:{state}")
+    await r.delete(f"pkce:{state}")
+    await r.aclose()
+
     flow = _build_flow()
     try:
-        flow.fetch_token(code=code)
+        if code_verifier:
+            flow.fetch_token(code=code, code_verifier=code_verifier)
+        else:
+            flow.fetch_token(code=code)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Erro ao trocar código: {exc}")
 
@@ -125,8 +146,8 @@ async def google_callback(
         )
     await db.commit()
 
-    # Redireciona de volta para o frontend
-    return RedirectResponse(url="/agenda?google=connected")
+    # Redireciona de volta para a tela de Integrações no frontend
+    return RedirectResponse(url="/integracoes?google=connected")
 
 
 @router.get("/google/status", summary="Status da conexão Google Calendar")
@@ -150,6 +171,41 @@ async def google_status(
         "calendar_id": token.calendar_id,
         "token_expiry": token.token_expiry.isoformat() if token.token_expiry else None,
     }
+
+
+@router.get("/google/all-status", summary="Status Google Calendar de todos os usuários (admin)")
+async def google_all_status(
+    _: AdminOnly,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> list[dict[str, Any]]:
+    """Retorna o status de conexão do Google Calendar de todos os usuários internos."""
+    users = (
+        await db.execute(
+            sa.select(User)
+            .where(User.is_active == True)
+            .where(User.role != UserRole.despachante_externo)
+            .order_by(User.name)
+        )
+    ).scalars().all()
+
+    tokens = (
+        await db.execute(sa.select(GoogleCalendarToken))
+    ).scalars().all()
+    token_by_user = {str(t.user_id): t for t in tokens}
+
+    result = []
+    for u in users:
+        token = token_by_user.get(str(u.id))
+        result.append({
+            "user_id": str(u.id),
+            "user_name": u.name,
+            "user_email": u.email,
+            "role": u.role,
+            "connected": token is not None,
+            "calendar_id": token.calendar_id if token else None,
+            "token_expiry": token.token_expiry.isoformat() if token and token.token_expiry else None,
+        })
+    return result
 
 
 @router.delete("/google/disconnect", summary="Desconectar Google Calendar")
@@ -222,9 +278,9 @@ async def sync_meeting_to_google(
     creds = _creds_from_token(token_row)
     service = build("calendar", "v3", credentials=creds)
 
-    start_dt = meeting.scheduled_at.isoformat()
-    # Duração padrão: 1 hora
     from datetime import timedelta
+
+    start_dt = meeting.scheduled_at.isoformat()
     end_dt = (meeting.scheduled_at + timedelta(hours=1)).isoformat()
 
     event_body: dict[str, Any] = {
@@ -236,26 +292,36 @@ async def sync_meeting_to_google(
 
     # Upsert: se já existe google_event_id na reunião, atualiza; senão cria
     google_event_id: str | None = getattr(meeting, "google_event_id", None)
-    if google_event_id:
-        event = (
-            service.events()
-            .update(
-                calendarId=token_row.calendar_id,
-                eventId=google_event_id,
-                body=event_body,
+    try:
+        if google_event_id:
+            event = (
+                service.events()
+                .update(
+                    calendarId=token_row.calendar_id,
+                    eventId=google_event_id,
+                    body=event_body,
+                )
+                .execute()
             )
-            .execute()
-        )
-    else:
-        event = (
-            service.events()
-            .insert(calendarId=token_row.calendar_id, body=event_body)
-            .execute()
-        )
-        # Persiste o ID do evento no registro da reunião (campo opcional)
-        if hasattr(meeting, "google_event_id"):
+        else:
+            event = (
+                service.events()
+                .insert(calendarId=token_row.calendar_id, body=event_body)
+                .execute()
+            )
             meeting.google_event_id = event["id"]
-            await db.commit()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Erro na API do Google Calendar: {exc}")
+
+    # Persiste google_event_id da reunião + salva novo access_token se foi renovado
+    if creds.token and creds.token != token_row.access_token:
+        token_row.access_token = creds.token
+        if creds.expiry:
+            expiry = creds.expiry
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+            token_row.token_expiry = expiry
+    await db.commit()
 
     return {"google_event_id": event.get("id"), "html_link": event.get("htmlLink")}
 

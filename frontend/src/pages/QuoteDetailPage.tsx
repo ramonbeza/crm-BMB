@@ -1,9 +1,21 @@
 import { useParams, Link } from "react-router-dom";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, AlertCircle, FileText, RefreshCw, Download } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Quote, QuoteStatus } from "@/types";
 import { formatDate } from "@/lib/utils";
+
+async function downloadPdf(url: string, filename: string) {
+  const res = await api.get(url, { responseType: "blob" });
+  const blob = new Blob([res.data], { type: "application/pdf" });
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(href);
+}
 import { D4SignPanel } from "@/components/D4SignPanel";
 
 // ── maps ──────────────────────────────────────────────────────────────────────
@@ -41,6 +53,7 @@ const fmt = (v: number) =>
 export function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const { data: q, isLoading } = useQuery<Quote>({
     queryKey: ["quote", id],
@@ -65,7 +78,7 @@ export function QuoteDetailPage() {
 
   const generateContract = useMutation({
     mutationFn: async () =>
-      (await api.post("/quotes/contratos/", {
+      (await api.post("/quotes/contratos", {
         client_id: q!.client_id,
         quote_id: q!.id,
         procedure_id: q!.procedure_id,
@@ -144,7 +157,7 @@ export function QuoteDetailPage() {
             {/* Cancel */}
             {canAdvance && q.status !== "rascunho" && (
               <button
-                onClick={() => updateStatus.mutate("cancelado")}
+                onClick={() => setConfirmCancel(true)}
                 disabled={updateStatus.isPending}
                 className="px-3 py-1.5 border border-red-200 text-red-600 text-xs font-medium rounded-md hover:bg-red-50 disabled:opacity-50"
               >
@@ -153,14 +166,13 @@ export function QuoteDetailPage() {
             )}
 
             {/* Download PDF */}
-            <a
-              href={`/api/v1/quotes/${q.id}/pdf`}
-              download={`${q.formatted_number}.pdf`}
+            <button
+              onClick={() => downloadPdf(`/quotes/${q.id}/pdf`, `${q.formatted_number}.pdf`)}
               className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-md hover:bg-gray-50"
             >
               <Download size={12} />
               Baixar PDF
-            </a>
+            </button>
 
             {/* New version */}
             <button
@@ -281,6 +293,30 @@ export function QuoteDetailPage() {
         entityStatus={q.status}
         onSigned={() => qc.invalidateQueries({ queryKey: ["quote", id] })}
       />
+
+      {confirmCancel && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+            <p className="text-base font-semibold text-gray-900 mb-2">Cancelar orçamento?</p>
+            <p className="text-sm text-gray-500 mb-5">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmCancel(false)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={() => { setConfirmCancel(false); updateStatus.mutate("cancelado"); }}
+                disabled={updateStatus.isPending}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50"
+              >
+                Cancelar orçamento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

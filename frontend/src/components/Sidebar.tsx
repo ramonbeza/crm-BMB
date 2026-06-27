@@ -33,8 +33,8 @@ const navItems: NavItem[] = [
 
 const roleLabel: Record<UserRole, string> = {
   admin: "Administrador",
-  advogado: "Advogado",
-  estagiario: "Estagiário",
+  advogado: "Advogado(a)",
+  estagiario: "Estagiário(a)",
   despachante_externo: "Despachante Externo",
 };
 

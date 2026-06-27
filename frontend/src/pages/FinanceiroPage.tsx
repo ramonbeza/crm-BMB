@@ -168,7 +168,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   const mutation = useMutation({
     mutationFn: async () =>
-      api.post("/financial/", {
+      api.post("/financial", {
         tipo: form.tipo,
         category: form.category,
         description: form.description,
@@ -315,6 +315,7 @@ export function FinanceiroPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [confirmPayId, setConfirmPayId] = useState<string | null>(null);
 
   const { data: dashboard } = useQuery<FinancialDashboard>({
     queryKey: ["financial-dashboard"],
@@ -327,7 +328,7 @@ export function FinanceiroPage() {
       const params: Record<string, string | number> = { page, page_size: 20 };
       if (filterTipo) params.tipo = filterTipo;
       if (filterStatus) params.status = filterStatus;
-      return (await api.get<PaginatedFinancialEntries>("/financial/", { params })).data;
+      return (await api.get<PaginatedFinancialEntries>("/financial", { params })).data;
     },
   });
 
@@ -341,8 +342,14 @@ export function FinanceiroPage() {
   });
 
   const handlePay = (id: string) => {
-    setPayingId(id);
-    payMutation.mutate(id);
+    setConfirmPayId(id);
+  };
+
+  const confirmPay = () => {
+    if (!confirmPayId) return;
+    setPayingId(confirmPayId);
+    payMutation.mutate(confirmPayId);
+    setConfirmPayId(null);
   };
 
   return (
@@ -546,6 +553,29 @@ export function FinanceiroPage() {
           </div>
         )}
       </div>
+
+      {confirmPayId && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+            <p className="text-base font-semibold text-gray-900 mb-4">Confirmar pagamento?</p>
+            <p className="text-sm text-gray-500 mb-6">Esta ação marcará o lançamento como pago.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmPayId(null)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmPay}
+                className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCreate && (
         <CreateModal

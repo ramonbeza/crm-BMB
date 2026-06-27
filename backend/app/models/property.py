@@ -96,9 +96,10 @@ CHECKLIST_TEMPLATES: dict[str, list[dict]] = {
         {"name": "Documentos pessoais do proprietário", "responsavel": "cliente"},
     ],
     "notificacao_extrajudicial": [
-        {"name": "Documentos pessoais do notificante", "responsavel": "cliente"},
+        {"name": "Documentos pessoais do notificante (RG, CPF)", "responsavel": "cliente"},
         {"name": "Comprovante de endereço do notificado", "responsavel": "cliente"},
-        {"name": "Documentação que fundamenta a notificação", "responsavel": "cliente"},
+        {"name": "Documentação que fundamenta a notificação (contrato, recibo, fotos, etc.)", "responsavel": "cliente"},
+        {"name": "Minuta da notificação", "responsavel": "escritorio"},
     ],
     "incorporacao_imobiliaria": [
         {"name": "Certidão de matrícula do terreno atualizada", "responsavel": "cliente"},
@@ -109,11 +110,13 @@ CHECKLIST_TEMPLATES: dict[str, list[dict]] = {
         {"name": "Certidão negativa de débitos do incorporador", "responsavel": "cliente"},
         {"name": "Documentos pessoais dos sócios/incorporadores", "responsavel": "cliente"},
     ],
-    "instituicao_condominio": [
-        {"name": "Certidão de matrícula atualizada", "responsavel": "cliente"},
+    "instituicao_imobiliaria": [
+        {"name": "Certidão de matrícula atualizada (≤ 30 dias)", "responsavel": "cliente"},
         {"name": "Habite-se / Auto de vistoria do Corpo de Bombeiros", "responsavel": "cliente"},
         {"name": "Projeto aprovado pela Prefeitura", "responsavel": "cliente"},
+        {"name": "Quadro de áreas (NBR 12.721)", "responsavel": "escritorio"},
         {"name": "Convenção de condomínio e regimento interno", "responsavel": "escritorio"},
+        {"name": "CND de INSS da obra (Certidão Negativa de Débito)", "responsavel": "cliente"},
         {"name": "Certidão de conclusão de obra", "responsavel": "cliente"},
         {"name": "Documentos pessoais do incorporador/proprietário", "responsavel": "cliente"},
     ],
@@ -129,11 +132,12 @@ CHECKLIST_TEMPLATES: dict[str, list[dict]] = {
     ],
     "divorcio": [
         {"name": "Certidão de casamento atualizada (≤ 90 dias)", "responsavel": "cliente"},
-        {"name": "Documentos pessoais de ambos os cônjuges", "responsavel": "cliente"},
+        {"name": "Documentos pessoais de ambos os cônjuges (RG, CPF, comprovante de residência)", "responsavel": "cliente"},
         {"name": "Certidões de nascimento dos filhos menores (se houver)", "responsavel": "cliente"},
-        {"name": "Documentos dos bens a partilhar (matrículas, CRVs, extratos)", "responsavel": "cliente"},
+        {"name": "Documentos dos bens a partilhar (matrículas, CRVs, extratos bancários)", "responsavel": "cliente"},
         {"name": "Certidão negativa de débitos dos imóveis", "responsavel": "cliente"},
         {"name": "Declaração de que não há filhos menores ou incapazes", "responsavel": "escritorio"},
+        {"name": "Minuta do acordo de partilha e alimentos (se houver)", "responsavel": "escritorio"},
     ],
 }
 

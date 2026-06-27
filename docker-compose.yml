@@ -68,6 +68,11 @@ services:
       FIRST_ADMIN_EMAIL: ${FIRST_ADMIN_EMAIL:-admin@crm.local}
       FIRST_ADMIN_PASSWORD: ${FIRST_ADMIN_PASSWORD:-changeme123}
       FIRST_ADMIN_NAME: ${FIRST_ADMIN_NAME:-Administrador}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost/api/v1/integrations/google/callback}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-5}
     depends_on:
       db:
         condition: service_healthy

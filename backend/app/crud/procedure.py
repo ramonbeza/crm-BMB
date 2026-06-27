@@ -231,6 +231,7 @@ class CRUDProcedure(CRUDBase[Procedure]):
         responsible_user_id: UUID | None = None,
         tag: str | None = None,
         executor_user_id: UUID | None = None,
+        property_id: UUID | None = None,
     ) -> PaginatedProcedures:
         q = self._q()
         if procedure_type:
@@ -245,6 +246,8 @@ class CRUDProcedure(CRUDBase[Procedure]):
             q = q.where(Procedure.tags.contains([tag]))
         if executor_user_id:
             q = q.where(Procedure.executor_user_id == executor_user_id)
+        if property_id:
+            q = q.where(Procedure.property_id == property_id)
 
         total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar_one()
         offset = (page - 1) * page_size

@@ -247,6 +247,8 @@ export function ClientFormPage() {
     return walk(obj) as T;
   };
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const mutation = useMutation({
     mutationFn: async (raw: PFForm | PJForm) => {
       const payload = cleanPayload(raw);
@@ -263,6 +265,10 @@ export function ClientFormPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       navigate("/clientes");
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setSaveError(detail ?? "Erro ao salvar. Verifique os dados e tente novamente.");
     },
   });
 
@@ -306,7 +312,7 @@ export function ClientFormPage() {
 
       {activeCt === "PF" ? (
         <form
-          onSubmit={pfForm.handleSubmit((d) => mutation.mutate(d))}
+          onSubmit={pfForm.handleSubmit((d) => { setSaveError(null); mutation.mutate(d); })}
           className="bg-white rounded-xl border border-gray-200 p-6 space-y-4"
         >
           <h2 className="font-semibold text-gray-700 border-b pb-2">Dados Pessoais</h2>
@@ -364,8 +370,8 @@ export function ClientFormPage() {
             <textarea {...pfForm.register("notes")} rows={3} className={inputCls} />
           </Field>
 
-          {mutation.isError && (
-            <p className="text-red-600 text-sm">Erro ao salvar. Verifique os dados.</p>
+          {saveError && (
+            <p className="text-red-600 text-sm">{saveError}</p>
           )}
 
           <div className="flex gap-3 pt-2">
@@ -387,7 +393,7 @@ export function ClientFormPage() {
         </form>
       ) : (
         <form
-          onSubmit={pjForm.handleSubmit((d) => mutation.mutate(d))}
+          onSubmit={pjForm.handleSubmit((d) => { setSaveError(null); mutation.mutate(d); })}
           className="bg-white rounded-xl border border-gray-200 p-6 space-y-4"
         >
           <h2 className="font-semibold text-gray-700 border-b pb-2">Dados da Empresa</h2>
@@ -441,8 +447,8 @@ export function ClientFormPage() {
             <textarea {...pjForm.register("notes")} rows={3} className={inputCls} />
           </Field>
 
-          {mutation.isError && (
-            <p className="text-red-600 text-sm">Erro ao salvar. Verifique os dados.</p>
+          {saveError && (
+            <p className="text-red-600 text-sm">{saveError}</p>
           )}
 
           <div className="flex gap-3 pt-2">

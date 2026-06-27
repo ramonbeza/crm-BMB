@@ -73,7 +73,7 @@ export function QuotesPage() {
   const { data } = useQuery({
     queryKey: ["quotes", statusFilter],
     queryFn: async () =>
-      (await api.get<PaginatedQuotes>(`/quotes/?page_size=100${statusFilter ? `&status=${statusFilter}` : ""}`)).data,
+      (await api.get<PaginatedQuotes>(`/quotes?page_size=100${statusFilter ? `&status=${statusFilter}` : ""}`)).data,
   });
 
   const { data: clients } = useQuery({
@@ -96,9 +96,16 @@ export function QuotesPage() {
     custasTotal;
   const total = Math.max(0, subtotal - (parseFloat(form.desconto) || 0));
 
+  const [formError, setFormError] = useState<string | null>(null);
+
   // ── Mutation ──
   const save = useMutation({
     mutationFn: async (f: FormState) => {
+      // Validate: custas with value > 0 must have a name
+      const invalidCusta = f.custas.find((c) => (c.value ?? 0) > 0 && !c.name.trim());
+      if (invalidCusta) {
+        throw new Error("Informe o nome de todas as custas com valor maior que zero.");
+      }
       const payload = {
         client_id: f.client_id,
         procedure_type: f.procedure_type || null,
@@ -110,12 +117,17 @@ export function QuotesPage() {
         valid_until: f.valid_until || null,
         notas: f.notas || null,
       };
-      return (await api.post("/quotes/", payload)).data;
+      return (await api.post("/quotes", payload)).data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["quotes"] });
       setOpen(false);
       setForm(emptyForm());
+      setFormError(null);
+    },
+    onError: (err: unknown) => {
+      const msg = (err as Error)?.message;
+      setFormError(msg ?? "Erro ao salvar orçamento.");
     },
   });
 
@@ -141,7 +153,7 @@ export function QuotesPage() {
           </p>
         </div>
         <button
-          onClick={() => { setForm(emptyForm()); setClientSearch(""); setOpen(true); }}
+          onClick={() => { setForm(emptyForm()); setClientSearch(""); setFormError(null); setOpen(true); }}
           className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
         >
           Novo Orçamento
@@ -316,13 +328,15 @@ export function QuotesPage() {
                       <Plus size={12} /> Adicionar custa
                     </button>
                   </div>
-                  {form.custas.map((c, i) => (
+                  {form.custas.map((c, i) => {
+                    const missingName = (c.value ?? 0) > 0 && !c.name.trim();
+                    return (
                     <div key={i} className="flex gap-2 mb-2">
                       <input
                         placeholder="Descrição (ex: ITBI, CRI, INCRA)"
                         value={c.name}
                         onChange={(e) => updateCusta(i, "name", e.target.value)}
-                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white"
+                        className={`flex-1 px-3 py-1.5 border rounded-md text-sm bg-white ${missingName ? "border-red-400 bg-red-50" : "border-gray-300"}`}
                       />
                       <input
                         type="number"
@@ -340,7 +354,8 @@ export function QuotesPage() {
                         <Trash2 size={15} />
                       </button>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
 
                 {/* Desconto */}
@@ -408,8 +423,8 @@ export function QuotesPage() {
                 />
               </div>
 
-              {save.isError && (
-                <p className="text-red-600 text-sm">Erro ao salvar. Verifique o cliente selecionado.</p>
+              {formError && (
+                <p className="text-red-600 text-sm">{formError}</p>
               )}
 
               <div className="flex gap-3 pt-2">

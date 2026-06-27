@@ -29,9 +29,15 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+_cors_origins = (
+    ["*"]
+    if settings.ENVIRONMENT == "development"
+    else [o.strip() for o in settings.FRONTEND_URL.split(",") if o.strip()]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.ENVIRONMENT == "development" else ["http://localhost"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

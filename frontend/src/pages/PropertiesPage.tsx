@@ -47,7 +47,7 @@ export function PropertiesPage() {
   const { data } = useQuery({
     queryKey: ["properties", search],
     queryFn: async () =>
-      (await api.get<PaginatedProperties>(`/properties/?page_size=100${search ? `&search=${encodeURIComponent(search)}` : ""}`)).data,
+      (await api.get<PaginatedProperties>(`/properties?page_size=100${search ? `&search=${encodeURIComponent(search)}` : ""}`)).data,
   });
 
   const save = useMutation({
@@ -65,7 +65,7 @@ export function PropertiesPage() {
         notas: f.notas || null,
         owners: [],
       };
-      return (await api.post("/properties/", payload)).data;
+      return (await api.post("/properties", payload)).data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["properties"] });

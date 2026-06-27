@@ -9,6 +9,7 @@ import type {
   PaginatedClients,
   ProcedureStatus,
   PaginatedProperties,
+  User,
 } from "@/types";
 import { formatDate } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ interface FormState {
   deadline: string;
   tags: string;
   property_id: string;
+  responsible_user_id: string;
 }
 
 const emptyForm = (): FormState => ({
@@ -45,6 +47,7 @@ const emptyForm = (): FormState => ({
   deadline: "",
   tags: "",
   property_id: "",
+  responsible_user_id: "",
 });
 
 export function ProceduresPage() {
@@ -58,7 +61,7 @@ export function ProceduresPage() {
   const { data } = useQuery({
     queryKey: ["procedures", statusFilter],
     queryFn: async () =>
-      (await api.get<PaginatedProcedures>(`/procedures/?page_size=100${statusFilter ? `&status=${statusFilter}` : ""}`)).data,
+      (await api.get<PaginatedProcedures>(`/procedures?page_size=100${statusFilter ? `&status=${statusFilter}` : ""}`)).data,
   });
 
   const { data: types } = useQuery({
@@ -76,9 +79,20 @@ export function ProceduresPage() {
   const { data: properties } = useQuery({
     queryKey: ["properties-picker", propertySearch],
     queryFn: async () =>
-      (await api.get<PaginatedProperties>(`/properties/?page_size=20${propertySearch ? `&search=${encodeURIComponent(propertySearch)}` : ""}`)).data,
+      (await api.get<PaginatedProperties>(`/properties?page_size=20${propertySearch ? `&search=${encodeURIComponent(propertySearch)}` : ""}`)).data,
     enabled: open,
   });
+
+  const { data: users } = useQuery({
+    queryKey: ["users-internal"],
+    queryFn: async () => {
+      const res = await api.get<User[]>("/users");
+      return res.data.filter((u) => u.is_active && u.role !== "despachante_externo");
+    },
+    enabled: open,
+  });
+
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const save = useMutation({
     mutationFn: async (f: FormState) => {
@@ -92,13 +106,19 @@ export function ProceduresPage() {
         deadline: f.deadline || null,
         tags: f.tags ? f.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
         property_id: f.property_id || null,
+        responsible_user_id: f.responsible_user_id || null,
       };
-      return (await api.post("/procedures/", payload)).data;
+      return (await api.post("/procedures", payload)).data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["procedures"] });
       setOpen(false);
       setForm(emptyForm());
+      setSaveError(null);
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setSaveError(detail ?? "Erro ao criar procedimento. Verifique os dados.");
     },
   });
 
@@ -112,7 +132,7 @@ export function ProceduresPage() {
           </p>
         </div>
         <button
-          onClick={() => { setForm(emptyForm()); setClientSearch(""); setOpen(true); }}
+          onClick={() => { setForm(emptyForm()); setClientSearch(""); setSaveError(null); setOpen(true); }}
           className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
         >
           Novo Procedimento
@@ -301,6 +321,20 @@ export function ProceduresPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Responsável</label>
+                <select
+                  value={form.responsible_user_id}
+                  onChange={(e) => setForm({ ...form, responsible_user_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                >
+                  <option value="">— sem responsável —</option>
+                  {(users ?? []).map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Etiquetas (separadas por vírgula)
                 </label>
@@ -312,8 +346,8 @@ export function ProceduresPage() {
                 />
               </div>
 
-              {save.isError && (
-                <p className="text-red-600 text-sm">Erro ao salvar. Selecione cliente e tipo.</p>
+              {saveError && (
+                <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
               )}
 
               <div className="flex gap-3 pt-2">

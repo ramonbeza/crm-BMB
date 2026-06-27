@@ -34,7 +34,7 @@ router = APIRouter()
 
 # ── Properties ────────────────────────────────────────────────────────────────
 
-@router.get("/", response_model=PaginatedProperties)
+@router.get("", response_model=PaginatedProperties)
 async def list_props(
     _: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -45,7 +45,7 @@ async def list_props(
     return await list_properties(db, page=page, page_size=page_size, search=search)
 
 
-@router.post("/", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
 async def create_prop(
     body: PropertyCreate,
     current_user: CurrentUser,
@@ -54,47 +54,7 @@ async def create_prop(
     return await create_property(db, obj_in=body, created_by_id=current_user.id)
 
 
-@router.get("/{property_id}", response_model=PropertyRead)
-async def get_prop(
-    property_id: UUID,
-    _: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_session)],
-):
-    prop = await get_property(db, property_id)
-    if not prop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imóvel não encontrado")
-    from app.crud.property import _to_read, _count_procedures
-    count = await _count_procedures(db, property_id)
-    return _to_read(prop, count)
-
-
-@router.put("/{property_id}", response_model=PropertyRead)
-async def update_prop(
-    property_id: UUID,
-    body: PropertyUpdate,
-    _: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_session)],
-):
-    prop = await get_property(db, property_id)
-    if not prop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imóvel não encontrado")
-    return await update_property(db, db_obj=prop, obj_in=body)
-
-
-@router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def deactivate_prop(
-    property_id: UUID,
-    _: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_session)],
-):
-    prop = await get_property(db, property_id)
-    if not prop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imóvel não encontrado")
-    prop.is_active = False
-    await db.commit()
-
-
-# ── Checklist items (by procedure) ────────────────────────────────────────────
+# ── Checklist items (by procedure) — ANTES de /{property_id} ─────────────────
 
 @router.get("/checklist/{procedure_id}", response_model=list[ProcChecklistItemRead])
 async def get_proc_checklist(
@@ -163,3 +123,45 @@ async def add_checklist(
         notas=item.notas,
         received_at=item.received_at,
     )
+
+
+# ── Property CRUD dinâmico — DEPOIS dos paths fixos ──────────────────────────
+
+@router.get("/{property_id}", response_model=PropertyRead)
+async def get_prop(
+    property_id: UUID,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    prop = await get_property(db, property_id)
+    if not prop:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imóvel não encontrado")
+    from app.crud.property import _to_read, _count_procedures
+    count = await _count_procedures(db, property_id)
+    return _to_read(prop, count)
+
+
+@router.put("/{property_id}", response_model=PropertyRead)
+async def update_prop(
+    property_id: UUID,
+    body: PropertyUpdate,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    prop = await get_property(db, property_id)
+    if not prop:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imóvel não encontrado")
+    return await update_property(db, db_obj=prop, obj_in=body)
+
+
+@router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def deactivate_prop(
+    property_id: UUID,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    prop = await get_property(db, property_id)
+    if not prop:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imóvel não encontrado")
+    prop.is_active = False
+    await db.commit()

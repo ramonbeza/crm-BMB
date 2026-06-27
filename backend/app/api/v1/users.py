@@ -12,7 +12,7 @@ from app.schemas.user import UserCreate, UserRead, UserUpdate
 router = APIRouter()
 
 
-@router.get("/", response_model=list[UserRead])
+@router.get("", response_model=list[UserRead])
 async def list_users(
     _: AdminOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
@@ -21,7 +21,7 @@ async def list_users(
     return await crud_user.get_all(db, include_inactive=include_inactive)
 
 
-@router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def create_user(
     body: UserCreate,
     _: AdminOnly,

@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
 
-const WS_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/v1/notifications/ws`;
+// No Railway, VITE_WS_URL = "wss://backend.up.railway.app"
+// Em dev local, usa o mesmo host do frontend (passa pelo nginx/proxy)
+const _wsBase =
+  import.meta.env.VITE_WS_URL ??
+  `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
+const WS_URL = `${_wsBase}/api/v1/notifications/ws`;
 
 export function useNotificationsWS() {
   const { accessToken } = useAuthStore();

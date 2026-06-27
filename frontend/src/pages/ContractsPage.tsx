@@ -3,6 +3,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, AlertCircle, Plus, Trash2, Download } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
+
+async function downloadPdf(url: string, filename: string) {
+  const res = await api.get(url, { responseType: "blob" });
+  const blob = new Blob([res.data], { type: "application/pdf" });
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(href);
+}
 import type {
   Contract,
   ContractStatus,
@@ -48,7 +59,7 @@ export function ContractsPage() {
   const { data } = useQuery({
     queryKey: ["contracts", statusFilter],
     queryFn: async () =>
-      (await api.get<PaginatedContracts>(`/quotes/contratos/?page_size=100${statusFilter ? `&status=${statusFilter}` : ""}`)).data,
+      (await api.get<PaginatedContracts>(`/quotes/contratos?page_size=100${statusFilter ? `&status=${statusFilter}` : ""}`)).data,
   });
 
   return (
@@ -133,6 +144,7 @@ export function ContractDetailPage() {
   const qc = useQueryClient();
   const [editingInstallments, setEditingInstallments] = useState(false);
   const [installments, setInstallments] = useState<InstallmentItem[]>([]);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const { data: c, isLoading } = useQuery<Contract>({
     queryKey: ["contract", id],
@@ -214,7 +226,7 @@ export function ContractDetailPage() {
             )}
             {canAdvance && c.status !== "rascunho" && (
               <button
-                onClick={() => updateStatus.mutate("cancelado")}
+                onClick={() => setConfirmCancel(true)}
                 disabled={updateStatus.isPending}
                 className="px-3 py-1.5 border border-red-200 text-red-600 text-xs font-medium rounded-md hover:bg-red-50"
               >
@@ -223,14 +235,13 @@ export function ContractDetailPage() {
             )}
 
             {/* Download PDF */}
-            <a
-              href={`/api/v1/quotes/contratos/${c.id}/pdf`}
-              download={`${c.formatted_number}.pdf`}
+            <button
+              onClick={() => downloadPdf(`/quotes/contratos/${c.id}/pdf`, `${c.formatted_number}.pdf`)}
               className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-md hover:bg-gray-50"
             >
               <Download size={12} />
               Baixar PDF
-            </a>
+            </button>
           </div>
         </div>
 
@@ -371,6 +382,30 @@ export function ContractDetailPage() {
         entityStatus={c.status}
         onSigned={() => qc.invalidateQueries({ queryKey: ["contract", id] })}
       />
+
+      {confirmCancel && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+            <p className="text-base font-semibold text-gray-900 mb-2">Cancelar contrato?</p>
+            <p className="text-sm text-gray-500 mb-5">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmCancel(false)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={() => { setConfirmCancel(false); updateStatus.mutate("cancelado"); }}
+                disabled={updateStatus.isPending}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50"
+              >
+                Cancelar contrato
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -407,29 +442,42 @@ function InstallmentEditor({
 
   return (
     <div className="space-y-2">
-      {installments.map((inst, i) => (
-        <div key={i} className="flex gap-2 items-center">
-          <span className="text-xs text-gray-400 w-4">{i + 1}</span>
-          <input
-            type="date"
-            value={inst.due_date}
-            onChange={(e) => update(i, "due_date", e.target.value)}
-            className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-          />
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={inst.value || ""}
-            onChange={(e) => update(i, "value", e.target.value)}
-            className="w-32 px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-            placeholder="R$"
-          />
-          <button onClick={() => remove(i)} className="text-gray-400 hover:text-red-500">
-            <Trash2 size={14} />
-          </button>
-        </div>
-      ))}
+      {installments.map((inst, i) => {
+        const isPast =
+          inst.due_date !== "" &&
+          inst.status === "pendente" &&
+          new Date(inst.due_date) < new Date(new Date().toDateString());
+        return (
+          <div key={i} className="space-y-0.5">
+            <div className="flex gap-2 items-center">
+              <span className="text-xs text-gray-400 w-4">{i + 1}</span>
+              <input
+                type="date"
+                value={inst.due_date}
+                onChange={(e) => update(i, "due_date", e.target.value)}
+                className={`flex-1 px-3 py-1.5 border rounded-md text-sm ${isPast ? "border-amber-400 bg-amber-50" : "border-gray-300"}`}
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={inst.value || ""}
+                onChange={(e) => update(i, "value", e.target.value)}
+                className="w-32 px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                placeholder="R$"
+              />
+              <button onClick={() => remove(i)} className="text-gray-400 hover:text-red-500">
+                <Trash2 size={14} />
+              </button>
+            </div>
+            {isPast && (
+              <p className="text-xs text-amber-600 pl-6">
+                Vencimento no passado — parcela em atraso
+              </p>
+            )}
+          </div>
+        );
+      })}
 
       <button
         onClick={add}

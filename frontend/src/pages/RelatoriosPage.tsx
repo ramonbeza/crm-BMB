@@ -3,6 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import { Download, FolderOpen, FileCheck } from "lucide-react";
 import { api } from "@/lib/api";
 
+// ── helpers ── download blob via Axios (preserves auth headers)
+async function downloadBlob(url: string, filename: string) {
+  const res = await api.get(url, { responseType: "blob" });
+  const href = URL.createObjectURL(new Blob([res.data]));
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(href);
+}
+
 // ── types ─────────────────────────────────────────────────────────────────────
 
 interface ProcedureReport {
@@ -87,10 +98,10 @@ export function RelatoriosPage() {
   });
 
   const handleExportProcedimentos = () => {
-    window.open("/api/v1/reports/export/procedures.xlsx", "_blank");
+    downloadBlob("/reports/export/procedures.xlsx", "procedimentos.xlsx");
   };
   const handleExportFinanceiro = () => {
-    window.open("/api/v1/reports/export/financial.xlsx", "_blank");
+    downloadBlob("/reports/export/financial.xlsx", "financeiro.xlsx");
   };
 
   return (
