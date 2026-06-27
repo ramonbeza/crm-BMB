@@ -152,6 +152,7 @@ class Property(UUIDMixin, TimestampMixin, Base):
     inscricao_imobiliaria: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
     incra_code: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
     property_type: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="urbano")
+    subtipo: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
     endereco: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     area_total: Mapped[float | None] = mapped_column(sa.Numeric(12, 4), nullable=True)
     area_unit: Mapped[str] = mapped_column(sa.String(10), nullable=False, default="m2")  # m2 | ha

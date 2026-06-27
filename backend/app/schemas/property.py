@@ -69,6 +69,7 @@ class PropertyCreate(BaseModel):
     inscricao_imobiliaria: str | None = None
     incra_code: str | None = None
     property_type: str = "urbano"
+    subtipo: str | None = None
     endereco: str | None = None
     area_total: float | None = None
     area_unit: str = "m2"
@@ -84,6 +85,7 @@ class PropertyUpdate(BaseModel):
     inscricao_imobiliaria: str | None = None
     incra_code: str | None = None
     property_type: str | None = None
+    subtipo: str | None = None
     endereco: str | None = None
     area_total: float | None = None
     area_unit: str | None = None
@@ -100,6 +102,7 @@ class PropertyRead(BaseModel):
     incra_code: str | None
     property_type: str
     property_type_label: str
+    subtipo: str | None
     endereco: str | None
     area_total: float | None
     area_unit: str

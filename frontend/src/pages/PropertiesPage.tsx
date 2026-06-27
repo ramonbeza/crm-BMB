@@ -21,6 +21,7 @@ interface FormState {
   inscricao_imobiliaria: string;
   incra_code: string;
   property_type: string;
+  subtipo: string;
   endereco: string;
   area_total: string;
   area_unit: string;
@@ -28,6 +29,19 @@ interface FormState {
   confrontantes: string;
   notas: string;
 }
+
+const SUBTIPOS = [
+  "Apartamento",
+  "Casa",
+  "Lote urbano",
+  "Lote com construção averbada",
+  "Sala comercial",
+  "Loja",
+  "Galpão / armazém",
+  "Terreno rural",
+  "Terreno rural com benfeitorias",
+  "Outro",
+];
 
 const emptyProprietario = (): Proprietario => ({
   nome: "",
@@ -45,6 +59,7 @@ const emptyForm = (): FormState => ({
   inscricao_imobiliaria: "",
   incra_code: "",
   property_type: "urbano",
+  subtipo: "",
   endereco: "",
   area_total: "",
   area_unit: "m2",
@@ -208,6 +223,7 @@ export function PropertiesPage() {
         inscricao_imobiliaria: data.inscricao_imobiliaria ?? "",
         incra_code: data.incra_code ?? "",
         property_type: data.property_type ?? "urbano",
+        subtipo: data.subtipo ?? "",
         endereco: data.endereco ?? "",
         area_total: data.area_total != null ? String(data.area_total) : "",
         area_unit: data.area_unit ?? "m2",
@@ -257,6 +273,7 @@ export function PropertiesPage() {
         inscricao_imobiliaria: f.inscricao_imobiliaria || null,
         incra_code: f.incra_code || null,
         property_type: f.property_type,
+        subtipo: f.subtipo || null,
         endereco: f.endereco || null,
         area_total: f.area_total ? parseFloat(f.area_total) : null,
         area_unit: f.area_unit,
@@ -362,6 +379,9 @@ export function PropertiesPage() {
                     }`}>
                       {typeLabel[p.property_type] ?? p.property_type}
                     </span>
+                    {(p as any).subtipo && (
+                      <p className="text-xs text-gray-500 mt-0.5">{(p as any).subtipo}</p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{p.endereco ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{p.cartorio ?? "—"}</td>
@@ -419,18 +439,42 @@ export function PropertiesPage() {
                 {extractError && <p className="text-red-600 text-xs mt-2">{extractError}</p>}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de imóvel *</label>
-                <select
-                  value={form.property_type}
-                  onChange={(e) => setForm({ ...form, property_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                >
-                  <option value="urbano">Urbano</option>
-                  <option value="rural">Rural</option>
-                  <option value="rural_urbano">Rural-Urbano</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de imóvel *</label>
+                  <select
+                    value={form.property_type}
+                    onChange={(e) => setForm({ ...form, property_type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  >
+                    <option value="urbano">Urbano</option>
+                    <option value="rural">Rural</option>
+                    <option value="rural_urbano">Rural-Urbano</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Subtipo / Natureza</label>
+                  <select
+                    value={SUBTIPOS.includes(form.subtipo) ? form.subtipo : form.subtipo ? "Outro" : ""}
+                    onChange={(e) => setForm({ ...form, subtipo: e.target.value === "Outro" ? "" : e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  >
+                    <option value="">— Selecione —</option>
+                    {SUBTIPOS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
+              {(form.subtipo && !SUBTIPOS.slice(0, -1).includes(form.subtipo)) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Especificar subtipo</label>
+                  <input
+                    placeholder="Ex: Lote com galpão industrial averbado"
+                    value={form.subtipo}
+                    onChange={(e) => setForm({ ...form, subtipo: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

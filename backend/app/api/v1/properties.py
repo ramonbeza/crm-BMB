@@ -49,6 +49,7 @@ Se houver múltiplas transferências, use os dados da última. Inclua a qualific
   "inscricao_imobiliaria": "inscrição imobiliária municipal se houver",
   "incra_code": "código INCRA se for imóvel rural",
   "property_type": "urbano | rural | rural_urbano",
+  "subtipo": "descrição física do imóvel conforme matrícula: apartamento | casa | lote urbano | lote com construção averbada | sala comercial | loja | galpão | terreno rural | terreno rural com benfeitorias | outro (especifique)",
   "endereco": "endereço completo do imóvel incluindo cidade e UF",
   "area_total": 0.0,
   "area_unit": "m2 | ha",
