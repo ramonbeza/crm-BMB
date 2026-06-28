@@ -226,7 +226,7 @@ def generate_ai_document(self, doc_id: str, doc_type: str, context: dict) -> dic
     try:
         import anthropic
 
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=120.0)
         user_prompt = build_prompt(doc_type, context)
 
         message = client.messages.create(
