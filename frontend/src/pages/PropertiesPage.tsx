@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FileText, Loader2, X, Search, Plus, Trash2, TableProperties, ShieldAlert } from "lucide-react";
+import { FileText, Loader2, X, Search, Plus, Trash2, ShieldAlert } from "lucide-react";
 import { api } from "@/lib/api";
 import type { PaginatedProperties } from "@/types";
 import { AnalisePanel, situacaoConfig } from "@/components/AnalisePanel";
@@ -208,41 +208,39 @@ export function PropertiesPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [extracting, setExtracting] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [analise, setAnalise] = useState<Analise | null>(null);
-  const [nbrUnidadesCount, setNbrUnidadesCount] = useState<number | null>(null);
-  const [nbrQuadro, setNbrQuadro] = useState<Record<string, unknown> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleExtract = async (file: File) => {
     setExtracting(true);
     setExtractError(null);
     setAnalise(null);
-    setNbrQuadro(null);
-    setNbrUnidadesCount(null);
+    setAnalyzing(false);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const { data } = await api.post("/properties/extract-full", fd, {
+      // Fase 1 — extração rápida dos dados cadastrais
+      const fd1 = new FormData();
+      fd1.append("file", file);
+      const { data } = await api.post("/properties/extract-matricula", fd1, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      const d = data.dados ?? data;
       setForm({
-        matricula: d.matricula ?? "",
-        inscricao_imobiliaria: d.inscricao_imobiliaria ?? "",
-        incra_code: d.incra_code ?? "",
-        property_type: d.property_type ?? "urbano",
-        subtipo: d.subtipo ?? "",
-        endereco: d.endereco ?? "",
-        area_total: d.area_total != null ? String(d.area_total) : "",
-        area_unit: d.area_unit ?? "m2",
-        cartorio: d.cartorio ?? "",
-        confrontantes: d.confrontantes ?? "",
+        matricula: data.matricula ?? "",
+        inscricao_imobiliaria: data.inscricao_imobiliaria ?? "",
+        incra_code: data.incra_code ?? "",
+        property_type: data.property_type ?? "urbano",
+        subtipo: data.subtipo ?? "",
+        endereco: data.endereco ?? "",
+        area_total: data.area_total != null ? String(data.area_total) : "",
+        area_unit: data.area_unit ?? "m2",
+        cartorio: data.cartorio ?? "",
+        confrontantes: data.confrontantes ?? "",
         notas: "",
       });
-      if (Array.isArray(d.proprietarios) && d.proprietarios.length > 0) {
+      if (Array.isArray(data.proprietarios) && data.proprietarios.length > 0) {
         setProprietarios(
-          d.proprietarios.map((p: Record<string, string | null>) => ({
+          data.proprietarios.map((p: Record<string, string | null>) => ({
             nome: p.nome ?? "",
             cpf: p.cpf ?? "",
             cnpj: p.cnpj ?? "",
@@ -254,14 +252,24 @@ export function PropertiesPage() {
           }))
         );
       }
-      if (data.analise_juridica) setAnalise(data.analise_juridica);
-      if (data.quadro_areas_nbr?.unidades?.length) {
-        setNbrQuadro(data.quadro_areas_nbr);
-        setNbrUnidadesCount(data.quadro_areas_nbr.unidades.length);
+      setExtracting(false);
+
+      // Fase 2 — análise jurídica em background (não bloqueia o formulário)
+      setAnalyzing(true);
+      try {
+        const fd2 = new FormData();
+        fd2.append("file", file);
+        const { data: aj } = await api.post("/properties/analyze-matricula", fd2, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        setAnalise(aj);
+      } catch {
+        // silently skip — user can analyze from PropertyDetailPage
+      } finally {
+        setAnalyzing(false);
       }
     } catch {
       setExtractError("Não foi possível extrair os dados. Verifique o documento e tente novamente.");
-    } finally {
       setExtracting(false);
     }
   };
@@ -294,7 +302,7 @@ export function PropertiesPage() {
         cartorio: f.cartorio || null,
         confrontantes: f.confrontantes || null,
         proprietarios: proprietarios.filter((p) => p.nome.trim()),
-        quadro_areas_nbr: nbrQuadro ?? null,
+        quadro_areas_nbr: null,
         analise_juridica: analise ?? null,
         notas: f.notas || null,
         owners: [],
@@ -307,8 +315,6 @@ export function PropertiesPage() {
       setForm(emptyForm());
       setProprietarios([]);
       setAnalise(null);
-      setNbrQuadro(null);
-      setNbrUnidadesCount(null);
     },
   });
 
@@ -324,7 +330,7 @@ export function PropertiesPage() {
           </p>
         </div>
         <button
-          onClick={() => { setForm(emptyForm()); setProprietarios([]); setExtractError(null); setAnalise(null); setNbrQuadro(null); setNbrUnidadesCount(null); setOpen(true); }}
+          onClick={() => { setForm(emptyForm()); setProprietarios([]); setExtractError(null); setAnalise(null); setOpen(true); }}
           className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
         >
           Novo Imóvel
@@ -437,7 +443,7 @@ export function PropertiesPage() {
                   Preencher automaticamente com a matrícula
                 </p>
                 <p className="text-xs text-primary-600 mb-3">
-                  Uma leitura — tudo de uma vez: dados cadastrais, qualificação dos proprietários, análise jurídica e quadro de áreas NBR (se aplicável).
+                  Fase 1 preenche o formulário na hora. A análise jurídica aparece em seguida, em background.
                 </p>
                 <input
                   ref={fileRef}
@@ -449,16 +455,22 @@ export function PropertiesPage() {
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  disabled={extracting}
+                  disabled={extracting || analyzing}
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg"
                 >
                   {extracting ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-                  {extracting ? "Analisando matrícula (aguarde)..." : "Carregar matrícula (PDF ou imagem)"}
+                  {extracting ? "Extraindo dados..." : "Carregar matrícula (PDF ou imagem)"}
                 </button>
                 {extractError && <p className="text-red-600 text-xs mt-2">{extractError}</p>}
               </div>
 
-              {/* Análise jurídica inline */}
+              {/* Análise jurídica — loading ou resultado */}
+              {analyzing && !analise && (
+                <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg border border-primary-100 bg-primary-50 text-primary-700 text-sm">
+                  <Loader2 size={15} className="animate-spin flex-shrink-0" />
+                  Gerando análise jurídica da matrícula...
+                </div>
+              )}
               {analise && (
                 <div className="rounded-lg border border-gray-200 bg-white p-4">
                   <div className="flex items-center gap-2 mb-3">
@@ -475,21 +487,6 @@ export function PropertiesPage() {
                     })()}
                   </div>
                   <AnalisePanel analise={analise} />
-                </div>
-              )}
-
-              {/* Quadro de áreas NBR */}
-              {nbrUnidadesCount != null && nbrUnidadesCount > 0 && (
-                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 flex items-center gap-3">
-                  <TableProperties size={16} className="text-green-600 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-green-800">
-                      Quadro de Áreas NBR 12.721 extraído — {nbrUnidadesCount} unidade{nbrUnidadesCount !== 1 ? "s" : ""}
-                    </p>
-                    <p className="text-xs text-green-600 mt-0.5">
-                      Será salvo automaticamente ao cadastrar. Você pode editar na página do imóvel.
-                    </p>
-                  </div>
                 </div>
               )}
 
