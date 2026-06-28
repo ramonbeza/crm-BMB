@@ -1,15 +1,18 @@
 /**
- * Sprint 10 — Painel de geração de documentos com IA.
- * Renderizado dentro da ProcedureDetailPage como uma aba ou seção.
+ * Painel de geração de documentos com IA — agrupado por tipo de procedimento.
  */
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, FileText, Loader2, Trash2, Copy, CheckCheck, AlertCircle, RefreshCw } from "lucide-react";
+import {
+  AlertCircle, CheckCheck, Copy, FileText, Loader2,
+  RefreshCw, Sparkles, Trash2,
+} from "lucide-react";
 import { api } from "@/lib/api";
 
 interface DocType {
   value: string;
   label: string;
+  suggested?: boolean;
 }
 
 interface AIDoc {
@@ -28,13 +31,71 @@ interface AIDoc {
 }
 
 const statusConfig = {
-  pendente: { label: "Na fila", cls: "bg-gray-100 text-gray-600", icon: null },
-  gerando: { label: "Gerando...", cls: "bg-blue-50 text-blue-700", icon: "spin" },
-  concluido: { label: "Pronto", cls: "bg-green-50 text-green-700", icon: null },
-  falhou: { label: "Falhou", cls: "bg-red-50 text-red-700", icon: null },
+  pendente:  { label: "Na fila",   cls: "bg-gray-100 text-gray-600",   icon: null   },
+  gerando:   { label: "Gerando...", cls: "bg-blue-50 text-blue-700",   icon: "spin" },
+  concluido: { label: "Pronto",    cls: "bg-green-50 text-green-700",  icon: null   },
+  falhou:    { label: "Falhou",    cls: "bg-red-50 text-red-700",      icon: null   },
 };
 
-export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
+// Campos extras por tipo de documento
+const ADVANCED_FIELDS: Record<string, { key: string; label: string; placeholder?: string }[]> = {
+  notificacao_extrajudicial: [
+    { key: "notified_name",         label: "Nome do Notificado",     placeholder: "João da Silva" },
+    { key: "notified_address",      label: "Endereço do Notificado", placeholder: "Rua X, 123, Cidade - UF" },
+    { key: "notification_subject",  label: "Assunto",                placeholder: "Irregularidade na posse..." },
+  ],
+  declaracao: [
+    { key: "declaration_subject", label: "Objeto da Declaração", placeholder: "Declaro para fins de..." },
+  ],
+  procuracao: [
+    { key: "powers", label: "Poderes Específicos", placeholder: "Representar perante o INCRA, prefeitura..." },
+  ],
+  minuta_contrato: [
+    { key: "other_parties",    label: "Outras Partes",        placeholder: "Maria Santos, CPF 000.000.000-00" },
+    { key: "contract_object",  label: "Objeto do Contrato",   placeholder: "Compra e venda do imóvel..." },
+  ],
+  contrato_cessao: [
+    { key: "other_parties",  label: "Cessionário",    placeholder: "Nome e qualificação do cessionário" },
+    { key: "fee_total",      label: "Valor da Cessão", placeholder: "R$ 250.000,00" },
+  ],
+  parecer: [
+    { key: "legal_question", label: "Questão Jurídica", placeholder: "Qual a viabilidade de usucapião..." },
+  ],
+  contrato_honorarios: [
+    { key: "fee_total",       label: "Valor dos Honorários",  placeholder: "R$ 10.000,00" },
+    { key: "payment_model",   label: "Modalidade",            placeholder: "fixo / parcelado / êxito" },
+  ],
+  recibo_pagamento: [
+    { key: "fee_total",     label: "Valor",              placeholder: "R$ 5.000,00" },
+    { key: "payment_model", label: "Forma de Pagamento", placeholder: "transferência bancária / PIX" },
+  ],
+  ata_notarial: [
+    { key: "extra_instructions", label: "Detalhes da Posse", placeholder: "Tempo de posse, benfeitorias realizadas, uso do imóvel..." },
+  ],
+  anuencia_confrontantes: [
+    { key: "extra_instructions", label: "Confrontantes", placeholder: "Norte: [nome]; Sul: [nome]; Leste: [nome]; Oeste: [nome]" },
+  ],
+  formal_partilha: [
+    { key: "extra_instructions", label: "Herdeiros e Bens", placeholder: "Liste herdeiros com CPF e bens a partilhar..." },
+  ],
+  minuta_escritura: [
+    { key: "contract_object", label: "Tipo de Escritura",    placeholder: "Compra e Venda / Inventário e Partilha / Doação" },
+    { key: "fee_total",       label: "Valor da Escritura",   placeholder: "R$ 500.000,00" },
+  ],
+  oficio_cartorio: [
+    { key: "extra_instructions", label: "Objeto do Ofício", placeholder: "Solicitar certidão de ônus reais atualizada..." },
+  ],
+  oficio_prefeitura: [
+    { key: "extra_instructions", label: "Objeto do Ofício", placeholder: "Solicitar aprovação do projeto de loteamento..." },
+  ],
+};
+
+interface Props {
+  procedureId: string;
+  procedureType?: string;
+}
+
+export function AIDocumentPanel({ procedureId, procedureType }: Props) {
   const qc = useQueryClient();
   const [selectedDocType, setSelectedDocType] = useState("");
   const [extraInstructions, setExtraInstructions] = useState("");
@@ -44,9 +105,14 @@ export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
   const [copied, setCopied] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Tipos por procedimento (sugeridos primeiro) ou todos
+  const typesUrl = procedureType
+    ? `/ai/types/procedure/${procedureType}`
+    : "/ai/types";
+
   const { data: docTypes } = useQuery<DocType[]>({
-    queryKey: ["ai-doc-types"],
-    queryFn: async () => (await api.get("/ai/types")).data,
+    queryKey: ["ai-doc-types", procedureType],
+    queryFn: async () => (await api.get(typesUrl)).data,
   });
 
   const { data: docs, refetch } = useQuery<AIDoc[]>({
@@ -54,18 +120,14 @@ export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
     queryFn: async () => (await api.get(`/ai/procedures/${procedureId}/documents`)).data,
   });
 
-  // Polling quando há docs em estado gerando/pendente
   useEffect(() => {
     const hasPending = docs?.some((d) => d.status === "pendente" || d.status === "gerando");
     if (hasPending) {
       pollingRef.current = setTimeout(() => refetch(), 3000);
     }
-    return () => {
-      if (pollingRef.current) clearTimeout(pollingRef.current);
-    };
+    return () => { if (pollingRef.current) clearTimeout(pollingRef.current); };
   }, [docs]);
 
-  // Atualiza selectedDoc quando docs muda
   useEffect(() => {
     if (selectedDoc) {
       const updated = docs?.find((d) => d.id === selectedDoc.id);
@@ -75,7 +137,7 @@ export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
 
   const generate = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: Record<string, string> = {
         doc_type: selectedDocType,
         extra_instructions: extraInstructions,
         ...advancedFields,
@@ -104,46 +166,17 @@ export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Campos extras por tipo de documento
-  const advancedFieldDefs: Record<string, { key: string; label: string; placeholder?: string }[]> = {
-    notificacao_extrajudicial: [
-      { key: "notified_name", label: "Nome do Notificado", placeholder: "João da Silva" },
-      { key: "notified_address", label: "Endereço do Notificado", placeholder: "Rua X, 123, Cidade - UF" },
-      { key: "notification_subject", label: "Assunto da Notificação", placeholder: "Irregularidade na posse do imóvel..." },
-    ],
-    declaracao: [
-      { key: "declaration_subject", label: "Objeto da Declaração", placeholder: "Declaro para fins de..." },
-    ],
-    procuracao: [
-      { key: "powers", label: "Poderes Específicos", placeholder: "Representar perante o INCRA, prefeitura..." },
-    ],
-    minuta_contrato: [
-      { key: "other_parties", label: "Outras Partes", placeholder: "Maria Santos, CPF 000.000.000-00" },
-      { key: "contract_object", label: "Objeto do Contrato", placeholder: "Compra e venda do imóvel matriculado sob nº..." },
-    ],
-    parecer: [
-      { key: "legal_question", label: "Questão Jurídica", placeholder: "Qual a viabilidade de usucapião extrajudicial considerando..." },
-    ],
-  };
-
-  const currentAdvancedFields = advancedFieldDefs[selectedDocType] || [];
+  const currentAdvancedFields = ADVANCED_FIELDS[selectedDocType] || [];
+  const suggestedTypes = docTypes?.filter((t) => t.suggested) ?? [];
+  const otherTypes = docTypes?.filter((t) => !t.suggested) ?? [];
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <div className="p-1.5 bg-violet-50 rounded-lg">
-          <Sparkles size={16} className="text-violet-600" />
-        </div>
-        <h2 className="text-sm font-bold text-gray-900">Geração de Documentos com IA</h2>
-        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Claude</span>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Gerador */}
         <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
           <p className="text-xs text-gray-500">
-            Selecione o tipo de documento. A IA usará os dados do procedimento para gerar um rascunho jurídico.
+            Selecione o tipo de documento. A IA usará os dados do procedimento, documentos extraídos e qualificações para gerar um rascunho.
           </p>
 
           <div>
@@ -154,9 +187,20 @@ export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
             >
               <option value="">— selecione —</option>
-              {docTypes?.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
+              {suggestedTypes.length > 0 && (
+                <optgroup label="✦ Sugeridos para este procedimento">
+                  {suggestedTypes.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </optgroup>
+              )}
+              {otherTypes.length > 0 && (
+                <optgroup label="Outros documentos">
+                  {otherTypes.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
@@ -171,7 +215,6 @@ export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
             />
           </div>
 
-          {/* Campos avançados por tipo */}
           {currentAdvancedFields.length > 0 && (
             <div>
               <button
@@ -179,7 +222,7 @@ export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
                 onClick={() => setShowAdvanced(!showAdvanced)}
                 className="text-xs text-violet-600 hover:text-violet-800 font-medium"
               >
-                {showAdvanced ? "▲ Ocultar campos específicos" : "▼ Preencher campos específicos"}
+                {showAdvanced ? "▲ Ocultar campos" : "▼ Preencher campos específicos"}
               </button>
               {showAdvanced && (
                 <div className="mt-2 space-y-2">
@@ -188,7 +231,7 @@ export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
                       <label className="block text-xs font-medium text-gray-600 mb-0.5">{f.label}</label>
                       <input
                         value={advancedFields[f.key] ?? ""}
-                        onChange={(e) => setAdvancedFields((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                        onChange={(e) => setAdvancedFields((p) => ({ ...p, [f.key]: e.target.value }))}
                         placeholder={f.placeholder}
                         className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-300"
                       />
@@ -262,7 +305,7 @@ export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
         </div>
       </div>
 
-      {/* Visualizador do documento selecionado */}
+      {/* Visualizador */}
       {selectedDoc && (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -293,7 +336,7 @@ export function AIDocumentPanel({ procedureId }: { procedureId: string }) {
             </div>
           </div>
 
-          {selectedDoc.status === "gerando" || selectedDoc.status === "pendente" ? (
+          {(selectedDoc.status === "gerando" || selectedDoc.status === "pendente") ? (
             <div className="flex items-center justify-center py-12 gap-3 text-violet-600">
               <Loader2 size={20} className="animate-spin" />
               <p className="text-sm">A IA está redigindo o documento...</p>

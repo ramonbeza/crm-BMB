@@ -7,6 +7,7 @@ import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, Che
 import { formatDate } from "@/lib/utils";
 import { AIDocumentPanel } from "@/components/AIDocumentPanel";
 import { ExtractedDocumentsPanel } from "@/components/ExtractedDocumentsPanel";
+import { WorkflowAssistantPanel } from "@/components/WorkflowAssistantPanel";
 import { useAuthStore } from "@/store/authStore";
 
 // ── label maps ───────────────────────────────────────────────────────────────
@@ -371,16 +372,65 @@ export function ProcedureDetailPage() {
         <ExtractedDocumentsPanel procedureId={p.id} />
       </div>
 
-      {/* IA — Geração de documentos */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6 mt-5">
-        <div className="flex items-center gap-2 mb-5">
-          <div className="p-1.5 bg-violet-50 rounded-lg">
-            <Sparkles size={16} className="text-violet-600" />
-          </div>
-          <h2 className="text-base font-bold text-gray-900">Documentos com IA</h2>
-          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full ml-1">Claude</span>
-        </div>
-        <AIDocumentPanel procedureId={p.id} />
+      {/* Assistente de fluxo + Geração de documentos */}
+      <ProcedureAISection procedureId={p.id} procedureType={p.procedure_type} />
+    </div>
+  );
+}
+
+// ── ProcedureAISection ────────────────────────────────────────────────────────
+// Wrapper com tabs: Assistente de Fluxo | Gerar Documentos
+
+type AITab = "workflow" | "generate";
+
+function ProcedureAISection({ procedureId, procedureType }: { procedureId: string; procedureType: string }) {
+  const [tab, setTab] = useState<AITab>("workflow");
+  const handleGenerateDoc = (_docType: string) => {
+    setTab("generate");
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl mt-5 overflow-hidden">
+      {/* Tab header */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setTab("workflow")}
+          className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium transition-colors ${
+            tab === "workflow"
+              ? "border-b-2 border-violet-500 text-violet-700 bg-violet-50/50"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          <Sparkles size={15} />
+          Assistente de Fluxo
+        </button>
+        <button
+          onClick={() => setTab("generate")}
+          className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium transition-colors ${
+            tab === "generate"
+              ? "border-b-2 border-violet-500 text-violet-700 bg-violet-50/50"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          <FileText size={15} />
+          Gerar Documentos
+        </button>
+        <span className="ml-auto self-center pr-4 text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full mr-4">Claude</span>
+      </div>
+
+      <div className="p-6">
+        {tab === "workflow" && (
+          <WorkflowAssistantPanel
+            procedureId={procedureId}
+            onGenerateDoc={handleGenerateDoc}
+          />
+        )}
+        {tab === "generate" && (
+          <AIDocumentPanel
+            procedureId={procedureId}
+            procedureType={procedureType}
+          />
+        )}
       </div>
     </div>
   );
