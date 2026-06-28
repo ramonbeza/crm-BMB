@@ -6,6 +6,7 @@ from uuid import UUID
 
 import anthropic
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -322,6 +323,52 @@ async def analyze_matricula(
         raise HTTPException(status_code=422, detail="Não foi possível gerar a análise.")
 
     return result
+
+
+@router.post("/analyze-matricula-stream")
+async def analyze_matricula_stream(
+    _: CurrentUser,
+    file: UploadFile = File(...),
+):
+    """Análise jurídica da matrícula com streaming SSE — texto aparece em tempo real."""
+    if not settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="Claude API não configurada.")
+
+    allowed = {"application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif"}
+    content_type = (file.content_type or "").split(";")[0].strip()
+    if content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Formato não suportado. Envie PDF, JPG ou PNG.")
+
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Arquivo muito grande (máx 20 MB).")
+
+    b64 = base64.standard_b64encode(data).decode()
+    if content_type == "application/pdf":
+        source_block: dict = {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": b64}}
+    else:
+        source_block = {"type": "image", "source": {"type": "base64", "media_type": content_type, "data": b64}}
+
+    async def event_generator():
+        try:
+            async_client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=180.0)
+            async with async_client.messages.stream(
+                model=settings.CLAUDE_MODEL,
+                max_tokens=4096,
+                messages=[{"role": "user", "content": [source_block, {"type": "text", "text": _ANALYZE_PROMPT}]}],
+            ) as stream:
+                async for text in stream.text_stream:
+                    yield f"data: {json.dumps({'text': text})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 _NBR_PROMPT = """Você é um engenheiro e especialista em NBR 12721 (Avaliação de custos unitários e preparo de orçamento de construção para incorporação de edifício em condomínio).

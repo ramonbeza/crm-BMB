@@ -6,6 +6,9 @@ import { api } from "@/lib/api";
 import type { PaginatedProperties } from "@/types";
 import { AnalisePanel, situacaoConfig } from "@/components/AnalisePanel";
 import type { Analise } from "@/components/AnalisePanel";
+import { StreamingAnalise } from "@/components/StreamingAnalise";
+import { streamAnalysis } from "@/lib/streamAnalysis";
+import { useAuthStore } from "@/store/authStore";
 
 interface Proprietario {
   nome: string;
@@ -207,8 +210,10 @@ export function PropertiesPage() {
   const [proprietarios, setProprietarios] = useState<Proprietario[]>([]);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [extracting, setExtracting] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [streamText, setStreamText] = useState("");
   const [extractError, setExtractError] = useState<string | null>(null);
   const [analise, setAnalise] = useState<Analise | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -254,20 +259,21 @@ export function PropertiesPage() {
       }
       setExtracting(false);
 
-      // Fase 2 — análise jurídica em background (não bloqueia o formulário)
+      // Fase 2 — análise jurídica em streaming (não bloqueia o formulário)
       setAnalyzing(true);
-      try {
-        const fd2 = new FormData();
-        fd2.append("file", file);
-        const { data: aj } = await api.post("/properties/analyze-matricula", fd2, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        setAnalise(aj);
-      } catch {
-        // silently skip — user can analyze from PropertyDetailPage
-      } finally {
-        setAnalyzing(false);
-      }
+      setStreamText("");
+      streamAnalysis(
+        file,
+        accessToken,
+        (chunk) => setStreamText((t) => t + chunk),
+        (fullText) => {
+          setAnalyzing(false);
+          const clean = fullText.replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "").trim();
+          try { setAnalise(JSON.parse(clean) as Analise); } catch { /* skip */ }
+          setStreamText("");
+        },
+        () => { setAnalyzing(false); setStreamText(""); },
+      );
     } catch {
       setExtractError("Não foi possível extrair os dados. Verifique o documento e tente novamente.");
       setExtracting(false);
@@ -315,6 +321,7 @@ export function PropertiesPage() {
       setForm(emptyForm());
       setProprietarios([]);
       setAnalise(null);
+      setStreamText("");
     },
   });
 
@@ -330,7 +337,7 @@ export function PropertiesPage() {
           </p>
         </div>
         <button
-          onClick={() => { setForm(emptyForm()); setProprietarios([]); setExtractError(null); setAnalise(null); setOpen(true); }}
+          onClick={() => { setForm(emptyForm()); setProprietarios([]); setExtractError(null); setAnalise(null); setStreamText(""); setOpen(true); }}
           className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
         >
           Novo Imóvel
@@ -464,11 +471,15 @@ export function PropertiesPage() {
                 {extractError && <p className="text-red-600 text-xs mt-2">{extractError}</p>}
               </div>
 
-              {/* Análise jurídica — loading ou resultado */}
-              {analyzing && !analise && (
-                <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg border border-primary-100 bg-primary-50 text-primary-700 text-sm">
-                  <Loader2 size={15} className="animate-spin flex-shrink-0" />
-                  Gerando análise jurídica da matrícula...
+              {/* Análise jurídica — streaming ou resultado */}
+              {(analyzing || streamText) && !analise && (
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShieldAlert size={15} className="text-primary-500" />
+                    <h3 className="text-sm font-semibold text-gray-800">Análise Jurídica da Matrícula</h3>
+                    <span className="text-xs bg-primary-50 text-primary-600 px-1.5 py-0.5 rounded font-medium">IA</span>
+                  </div>
+                  <StreamingAnalise streamText={streamText} isStreaming={analyzing} analise={null} />
                 </div>
               )}
               {analise && (

@@ -10,6 +10,9 @@ import { api } from "@/lib/api";
 import type { Property, PaginatedProcedures } from "@/types";
 import { AnalisePanel } from "@/components/AnalisePanel";
 import type { Analise } from "@/components/AnalisePanel";
+import { StreamingAnalise } from "@/components/StreamingAnalise";
+import { streamAnalysis } from "@/lib/streamAnalysis";
+import { useAuthStore } from "@/store/authStore";
 
 const typeLabel: Record<string, string> = {
   urbano: "Urbano",
@@ -403,6 +406,9 @@ export function PropertyDetailPage() {
   const [analise, setAnalise] = useState<Analise | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const [streamText, setStreamText] = useState("");
+
   const { data: prop, isLoading } = useQuery<Property>({
     queryKey: ["property", id],
     queryFn: async () => (await api.get<Property>(`/properties/${id}`)).data,
@@ -423,22 +429,32 @@ export function PropertyDetailPage() {
     enabled: !!id,
   });
 
-  const handleAnalyze = async (file: File) => {
+  const handleAnalyze = (file: File) => {
     setAnalyzing(true);
     setAnalyzeError(null);
     setAnalise(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const { data } = await api.post("/properties/analyze-matricula", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setAnalise(data);
-    } catch {
-      setAnalyzeError("Não foi possível analisar o documento. Verifique a qualidade e tente novamente.");
-    } finally {
-      setAnalyzing(false);
-    }
+    setStreamText("");
+
+    streamAnalysis(
+      file,
+      accessToken,
+      (chunk) => setStreamText((t) => t + chunk),
+      (fullText) => {
+        setAnalyzing(false);
+        const clean = fullText.replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "").trim();
+        try {
+          setAnalise(JSON.parse(clean) as Analise);
+        } catch {
+          setAnalyzeError("Análise recebida mas não foi possível interpretar o resultado.");
+        }
+        setStreamText("");
+      },
+      (msg) => {
+        setAnalyzing(false);
+        setAnalyzeError(msg);
+        setStreamText("");
+      },
+    );
   };
 
   if (isLoading) {
@@ -624,10 +640,16 @@ export function PropertyDetailPage() {
           </p>
         )}
 
-        {analyzing && (
+        {(analyzing || streamText) && !analise && (
+          <div className="py-4">
+            <StreamingAnalise streamText={streamText} isStreaming={analyzing} analise={null} />
+          </div>
+        )}
+
+        {analyzing && !streamText && (
           <div className="py-8 flex flex-col items-center gap-3 text-primary-600">
             <Loader2 size={28} className="animate-spin" />
-            <p className="text-sm">Lendo e analisando a matrícula...</p>
+            <p className="text-sm">Conectando ao Claude...</p>
           </div>
         )}
 
@@ -638,7 +660,7 @@ export function PropertyDetailPage() {
           </div>
         )}
 
-        {analise && !analyzing && <AnalisePanel analise={analise} />}
+        {analise && !analyzing && !streamText && <AnalisePanel analise={analise} />}
       </div>
 
       {/* Procedures linked to this property */}
