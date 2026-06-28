@@ -115,6 +115,19 @@ async def update_procedure(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Despachante-externo não pode editar dados do procedimento. Use a rota de etapas.",
         )
+    # Valida que executor_user_id pertence a um despachante-externo
+    if body.executor_user_id is not None:
+        import sqlalchemy as sa
+        from app.models.user import User
+        res = await db.execute(sa.select(User).where(User.id == body.executor_user_id))
+        executor = res.scalar_one_or_none()
+        if not executor:
+            raise HTTPException(status_code=404, detail="Usuário executor não encontrado.")
+        if executor.role != UserRole.despachante_externo:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Usuário '{executor.name}' não é despachante-externo (role atual: {executor.role}).",
+            )
     old_status = p.status
     result = await crud_procedure.update_procedure(db, db_obj=p, obj_in=body)
     # Audita apenas quando há mudança de status

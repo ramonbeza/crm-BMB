@@ -1,10 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   Users,
   FolderOpen,
   FileCheck,
   Receipt,
+  RefreshCw,
   TrendingUp,
   Clock,
   AlertTriangle,
@@ -149,12 +150,17 @@ function MiniBar({
 
 export function DashboardPage() {
   const user = useAuthStore((s) => s.user);
+  const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery<DashboardData>({
+  const { data, isLoading, isFetching, dataUpdatedAt } = useQuery<DashboardData>({
     queryKey: ["dashboard-kpis"],
     queryFn: async () => (await api.get<DashboardData>("/reports/dashboard")).data,
     refetchInterval: 60_000,
   });
+
+  const updatedLabel = dataUpdatedAt
+    ? new Date(dataUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : null;
 
   const roleLabel: Record<string, string> = {
     admin: "Administrador",
@@ -181,18 +187,29 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">
-          {greeting}, {user?.name?.split(" ")[0]} 👋
-        </h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {roleLabel[user?.role ?? ""] ?? user?.role} ·{" "}
-          {new Date().toLocaleDateString("pt-BR", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-          })}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">
+            {greeting}, {user?.name?.split(" ")[0]} 👋
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {roleLabel[user?.role ?? ""] ?? user?.role} ·{" "}
+            {new Date().toLocaleDateString("pt-BR", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            })}
+          </p>
+        </div>
+        <button
+          onClick={() => qc.invalidateQueries({ queryKey: ["dashboard-kpis"] })}
+          disabled={isFetching}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 disabled:opacity-40 transition-colors mt-1"
+          title="Atualizar dados"
+        >
+          <RefreshCw size={13} className={isFetching ? "animate-spin" : ""} />
+          {updatedLabel ? `Atualizado às ${updatedLabel}` : "Atualizar"}
+        </button>
       </div>
 
       {/* KPI grid */}

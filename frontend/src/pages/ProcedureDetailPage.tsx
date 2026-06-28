@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, User, Briefcase, DollarSign, X, Sparkles, ExternalLink, Copy, Check } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, Receipt, User, Briefcase, DollarSign, X, Sparkles, ExternalLink, Copy, Check } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, ChecklistStatus, ProcedureFinancialSummary, FinancialEntryListItem, PaginatedFinancialEntries, EntryTipo, EntryCategory, User as UserType } from "@/types";
 import { formatDate } from "@/lib/utils";
@@ -169,10 +169,11 @@ const stageCls: Record<StageStatus, string> = {
 interface StageRowProps {
   stage: Stage;
   procedureId: string;
+  pendingChecklistCount: number;
   onUpdate: () => void;
 }
 
-function StageRow({ stage, procedureId, onUpdate }: StageRowProps) {
+function StageRow({ stage, procedureId, pendingChecklistCount, onUpdate }: StageRowProps) {
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState(stage.notes ?? "");
@@ -195,7 +196,18 @@ function StageRow({ stage, procedureId, onUpdate }: StageRowProps) {
       em_andamento: "concluida",
       concluida: "pendente",
     };
-    update.mutate({ status: next[stage.status] });
+    const nextStatus = next[stage.status];
+    if (
+      nextStatus === "concluida" &&
+      stage.order === 1 &&
+      pendingChecklistCount > 0
+    ) {
+      const ok = window.confirm(
+        `Atenção: há ${pendingChecklistCount} item(s) de checklist ainda pendente(s).\n\nDeseja concluir esta etapa mesmo assim?`
+      );
+      if (!ok) return;
+    }
+    update.mutate({ status: nextStatus });
   };
 
   const saveExtra = () => {
@@ -304,6 +316,7 @@ function StageRow({ stage, procedureId, onUpdate }: StageRowProps) {
 export function ProcedureDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { user: currentUser } = useAuthStore();
   const isInternal = currentUser?.role !== "despachante_externo";
 
@@ -356,6 +369,7 @@ export function ProcedureDetailPage() {
 
   const protocolFormatted = `BMB-${new Date(p.opened_at).getFullYear()}-${String(p.protocol_number).padStart(4, "0")}`;
   const stagesDone = p.stages.filter((s) => s.status === "concluida").length;
+  const pendingChecklistCount = p.checklist_items.filter((i) => i.status === "pendente").length;
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -388,11 +402,37 @@ export function ProcedureDetailPage() {
 
           {/* Status change — only internal users */}
           {isInternal && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
+              <button
+                onClick={() => navigate("/orcamentos", {
+                  state: {
+                    prefill: {
+                      client_id: p.client_id,
+                      client_name: p.client_name,
+                      procedure_id: p.id,
+                      procedure_label: `${protocolFormatted} — ${p.procedure_type_label}`,
+                    },
+                  },
+                })}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-primary-200 text-primary-700 hover:bg-primary-50 rounded-md transition-colors"
+                title="Criar orçamento para este procedimento"
+              >
+                <Receipt size={13} />
+                Criar orçamento
+              </button>
+              <div className="h-4 w-px bg-gray-200" />
               {(["em_andamento", "concluido", "cancelado"] as ProcedureStatus[]).map((s) => (
                 <button
                   key={s}
-                  onClick={() => updateStatus.mutate(s)}
+                  onClick={() => {
+                    if (s === "concluido" && pendingChecklistCount > 0) {
+                      const ok = window.confirm(
+                        `Atenção: há ${pendingChecklistCount} item(s) de checklist pendente(s).\n\nDeseja concluir o procedimento mesmo assim?`
+                      );
+                      if (!ok) return;
+                    }
+                    updateStatus.mutate(s);
+                  }}
                   disabled={p.status === s || updateStatus.isPending}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-40 disabled:cursor-default ${
                     p.status === s
@@ -480,6 +520,7 @@ export function ProcedureDetailPage() {
                 key={stage.id}
                 stage={stage}
                 procedureId={p.id}
+                pendingChecklistCount={pendingChecklistCount}
                 onUpdate={() => qc.invalidateQueries({ queryKey: ["procedure", id] })}
               />
             ))}

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -38,6 +38,7 @@ const fmt = (v: number) =>
 
 interface FormState {
   client_id: string;
+  procedure_id: string;
   procedure_type: string;
   honorarios_escritorio: string;
   honorarios_despachante: string;
@@ -50,6 +51,7 @@ interface FormState {
 
 const emptyForm = (): FormState => ({
   client_id: "",
+  procedure_id: "",
   procedure_type: "",
   honorarios_escritorio: "",
   honorarios_despachante: "",
@@ -64,10 +66,26 @@ const emptyForm = (): FormState => ({
 
 export function QuotesPage() {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<FormState>(emptyForm());
+  const location = useLocation();
+  const prefill = (location.state as { prefill?: { client_id: string; client_name: string; procedure_id: string; procedure_label: string } } | null)?.prefill;
+
+  const [open, setOpen] = useState(() => !!prefill);
+  const [form, setForm] = useState<FormState>(() =>
+    prefill ? { ...emptyForm(), client_id: prefill.client_id, procedure_id: prefill.procedure_id } : emptyForm()
+  );
+  const [prefillLabel, setPrefillLabel] = useState<{ client: string; procedure: string } | null>(
+    prefill ? { client: prefill.client_name, procedure: prefill.procedure_label } : null
+  );
   const [clientSearch, setClientSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+
+  useEffect(() => {
+    if (prefill) {
+      setForm((f) => ({ ...f, client_id: prefill.client_id, procedure_id: prefill.procedure_id }));
+      setPrefillLabel({ client: prefill.client_name, procedure: prefill.procedure_label });
+      setOpen(true);
+    }
+  }, []);
 
   // ── Queries ──
   const { data } = useQuery({
@@ -101,13 +119,17 @@ export function QuotesPage() {
   // ── Mutation ──
   const save = useMutation({
     mutationFn: async (f: FormState) => {
-      // Validate: custas with value > 0 must have a name
+      if (!f.client_id) throw new Error("Selecione um cliente.");
+      if (!f.procedure_type) throw new Error("Selecione o tipo de procedimento.");
+      const totalHonorarios = (parseFloat(f.honorarios_escritorio) || 0) + (parseFloat(f.honorarios_despachante) || 0);
+      if (totalHonorarios <= 0) throw new Error("Informe ao menos um valor de honorários maior que zero.");
       const invalidCusta = f.custas.find((c) => (c.value ?? 0) > 0 && !c.name.trim());
       if (invalidCusta) {
         throw new Error("Informe o nome de todas as custas com valor maior que zero.");
       }
       const payload = {
         client_id: f.client_id,
+        procedure_id: f.procedure_id || null,
         procedure_type: f.procedure_type || null,
         honorarios_escritorio: parseFloat(f.honorarios_escritorio) || 0,
         honorarios_despachante: parseFloat(f.honorarios_despachante) || 0,
@@ -232,10 +254,18 @@ export function QuotesPage() {
           <div className="bg-white rounded-xl w-full max-w-2xl p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold">Novo Orçamento</h2>
-              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-700">
+              <button onClick={() => { setOpen(false); setPrefillLabel(null); }} className="text-gray-400 hover:text-gray-700">
                 <X size={20} />
               </button>
             </div>
+
+            {prefillLabel && (
+              <div className="bg-primary-50 border border-primary-100 rounded-lg px-4 py-3 mb-4">
+                <p className="text-xs font-semibold text-primary-700 mb-0.5">Vinculado ao procedimento</p>
+                <p className="text-sm text-gray-700">{prefillLabel.procedure}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Cliente: {prefillLabel.client}</p>
+              </div>
+            )}
 
             <div className="space-y-5">
               {/* Cliente */}
@@ -430,7 +460,7 @@ export function QuotesPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => save.mutate(form)}
-                  disabled={save.isPending || !form.client_id}
+                  disabled={save.isPending}
                   className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 py-2 rounded-lg text-sm"
                 >
                   {save.isPending ? "Criando..." : "Criar orçamento"}
