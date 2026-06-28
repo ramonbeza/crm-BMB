@@ -56,12 +56,17 @@ export function ProceduresPage() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [clientSearch, setClientSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [propertySearch, setPropertySearch] = useState("");
 
   const { data } = useQuery({
-    queryKey: ["procedures", statusFilter],
-    queryFn: async () =>
-      (await api.get<PaginatedProcedures>(`/procedures?page_size=100${statusFilter ? `&status=${statusFilter}` : ""}`)).data,
+    queryKey: ["procedures", statusFilter, typeFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page_size: "100" });
+      if (statusFilter) params.set("status", statusFilter);
+      if (typeFilter) params.set("procedure_type", typeFilter);
+      return (await api.get<PaginatedProcedures>(`/procedures?${params}`)).data;
+    },
   });
 
   const { data: types } = useQuery({
@@ -139,7 +144,7 @@ export function ProceduresPage() {
         </button>
       </div>
 
-      <div className="flex gap-3 mb-4">
+      <div className="flex gap-3 mb-4 flex-wrap">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -150,6 +155,24 @@ export function ProceduresPage() {
           <option value="concluido">Concluído</option>
           <option value="cancelado">Cancelado</option>
         </select>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+        >
+          <option value="">Todos os tipos</option>
+          {types?.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+        {(statusFilter || typeFilter) && (
+          <button
+            onClick={() => { setStatusFilter(""); setTypeFilter(""); }}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 underline"
+          >
+            Limpar filtros
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
