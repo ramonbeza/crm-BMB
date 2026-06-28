@@ -77,6 +77,7 @@ export function QuotesPage() {
     prefill ? { client: prefill.client_name, procedure: prefill.procedure_label } : null
   );
   const [clientSearch, setClientSearch] = useState("");
+  const [procSearch, setProcSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
@@ -104,6 +105,15 @@ export function QuotesPage() {
   const { data: types } = useQuery({
     queryKey: ["procedure-types"],
     queryFn: async () => (await api.get<ProcedureTypeOption[]>("/procedures/types")).data,
+  });
+
+  const { data: procedures } = useQuery({
+    queryKey: ["procedures-picker-quote", procSearch],
+    queryFn: async () =>
+      (await api.get<{ items: Array<{ id: string; protocol_number: number; procedure_type_label: string; client_name: string }> }>(
+        `/procedures?page_size=10${procSearch ? `&search=${encodeURIComponent(procSearch)}` : ""}`
+      )).data,
+    enabled: open && !prefillLabel,
   });
 
   // ── Computed totals ──
@@ -291,10 +301,38 @@ export function QuotesPage() {
                 </select>
               </div>
 
+              {/* Procedimento vinculado */}
+              {!prefillLabel && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Procedimento vinculado
+                    <span className="text-xs text-gray-400 font-normal ml-1">(opcional — para rastreabilidade)</span>
+                  </label>
+                  <input
+                    placeholder="Buscar por protocolo ou tipo..."
+                    value={procSearch}
+                    onChange={(e) => setProcSearch(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-1"
+                  />
+                  <select
+                    value={form.procedure_id}
+                    onChange={(e) => setForm({ ...form, procedure_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  >
+                    <option value="">— nenhum —</option>
+                    {procedures?.items.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        #{String(p.protocol_number).padStart(4, "0")} · {p.procedure_type_label} · {p.client_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Tipo */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de procedimento</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de procedimento *</label>
                   <select
                     value={form.procedure_type}
                     onChange={(e) => setForm({ ...form, procedure_type: e.target.value })}

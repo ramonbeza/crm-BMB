@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, AlertCircle, Plus, Trash2, Download } from "lucide-react";
+import { ArrowLeft, AlertCircle, Edit2, Plus, Save, Trash2, X, Download } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 
@@ -145,6 +145,10 @@ export function ContractDetailPage() {
   const [editingInstallments, setEditingInstallments] = useState(false);
   const [installments, setInstallments] = useState<InstallmentItem[]>([]);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [editTotal, setEditTotal] = useState("");
+  const [editNotas, setEditNotas] = useState("");
+  const [editExito, setEditExito] = useState("");
 
   const { data: c, isLoading } = useQuery<Contract>({
     queryKey: ["contract", id],
@@ -166,6 +170,33 @@ export function ContractDetailPage() {
       setEditingInstallments(false);
     },
   });
+
+  const updateMeta = useMutation({
+    mutationFn: async (data: { total_value?: number; notas?: string | null; exito_percentual?: number | null }) =>
+      (await api.put(`/quotes/contratos/${id}`, data)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contract", id] });
+      setEditingMeta(false);
+    },
+  });
+
+  const startEditMeta = () => {
+    if (!c) return;
+    setEditTotal(String(c.total_value));
+    setEditNotas(c.notas ?? "");
+    setEditExito(c.exito_percentual != null ? String(c.exito_percentual) : "");
+    setEditingMeta(true);
+  };
+
+  const saveMeta = () => {
+    const total = parseFloat(editTotal);
+    if (isNaN(total) || total < 0) return;
+    updateMeta.mutate({
+      total_value: total,
+      notas: editNotas || null,
+      exito_percentual: editExito ? parseFloat(editExito) : null,
+    });
+  };
 
   if (isLoading) {
     return (
@@ -246,50 +277,120 @@ export function ContractDetailPage() {
         </div>
 
         {/* Meta */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3 text-sm">
-          <div>
-            <p className="text-xs font-medium text-gray-500">Modelo de pagamento</p>
-            <p className="text-gray-800 mt-0.5">{c.payment_model_label}</p>
+        {editingMeta ? (
+          <div className="space-y-4 pt-1">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Valor total (R$)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editTotal}
+                  onChange={(e) => setEditTotal(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Percentual de êxito (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={editExito}
+                  onChange={(e) => setEditExito(e.target.value)}
+                  placeholder="—"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary-400"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Observações</label>
+              <textarea
+                rows={3}
+                value={editNotas}
+                onChange={(e) => setEditNotas(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary-400 resize-none"
+                placeholder="Observações sobre o contrato..."
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={saveMeta}
+                disabled={updateMeta.isPending}
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg"
+              >
+                <Save size={13} />
+                {updateMeta.isPending ? "Salvando..." : "Salvar"}
+              </button>
+              <button
+                onClick={() => setEditingMeta(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-xs rounded-lg hover:bg-gray-50"
+              >
+                <X size={13} />
+                Cancelar
+              </button>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500">Valor total</p>
-            <p className="text-gray-900 font-bold mt-0.5">{fmt(c.total_value)}</p>
-          </div>
-          {c.exito_percentual != null && (
-            <div>
-              <p className="text-xs font-medium text-gray-500">Percentual de êxito</p>
-              <p className="text-gray-800 mt-0.5">{c.exito_percentual}%</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3 text-sm">
+              <div>
+                <p className="text-xs font-medium text-gray-500">Modelo de pagamento</p>
+                <p className="text-gray-800 mt-0.5">{c.payment_model_label}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500">Valor total</p>
+                <p className="text-gray-900 font-bold mt-0.5">{fmt(c.total_value)}</p>
+              </div>
+              {c.exito_percentual != null && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Percentual de êxito</p>
+                  <p className="text-gray-800 mt-0.5">{c.exito_percentual}%</p>
+                </div>
+              )}
+              {c.signed_at && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Assinado em</p>
+                  <p className="text-gray-800 mt-0.5">{new Date(c.signed_at).toLocaleDateString("pt-BR")}</p>
+                </div>
+              )}
+              {c.quote_id && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Orçamento origem</p>
+                  <Link to={`/orcamentos/${c.quote_id}`} className="text-primary-600 text-sm hover:underline block mt-0.5">
+                    Ver orçamento →
+                  </Link>
+                </div>
+              )}
+              {c.procedure_id && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Procedimento</p>
+                  <Link to={`/procedimentos/${c.procedure_id}`} className="text-primary-600 text-sm hover:underline block mt-0.5">
+                    Ver procedimento →
+                  </Link>
+                </div>
+              )}
             </div>
-          )}
-          {c.signed_at && (
-            <div>
-              <p className="text-xs font-medium text-gray-500">Assinado em</p>
-              <p className="text-gray-800 mt-0.5">{new Date(c.signed_at).toLocaleDateString("pt-BR")}</p>
-            </div>
-          )}
-          {c.quote_id && (
-            <div>
-              <p className="text-xs font-medium text-gray-500">Orçamento origem</p>
-              <Link to={`/orcamentos/${c.quote_id}`} className="text-primary-600 text-sm hover:underline block mt-0.5">
-                Ver orçamento →
-              </Link>
-            </div>
-          )}
-          {c.procedure_id && (
-            <div>
-              <p className="text-xs font-medium text-gray-500">Procedimento</p>
-              <Link to={`/procedimentos/${c.procedure_id}`} className="text-primary-600 text-sm hover:underline block mt-0.5">
-                Ver procedimento →
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {c.notas && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-xs font-medium text-gray-500 mb-1">Observações</p>
-            <p className="text-sm text-gray-700">{c.notas}</p>
-          </div>
+            {c.notas && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-xs font-medium text-gray-500 mb-1">Observações</p>
+                <p className="text-sm text-gray-700">{c.notas}</p>
+              </div>
+            )}
+            {c.status !== "cancelado" && (
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <button
+                  onClick={startEditMeta}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-primary-600 transition-colors"
+                >
+                  <Edit2 size={12} />
+                  Editar valor, êxito e observações
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
