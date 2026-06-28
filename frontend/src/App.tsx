@@ -6,6 +6,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { ClientsPage } from "@/pages/ClientsPage";
 import { ClientFormPage } from "@/pages/ClientFormPage";
+import { ClientDetailPage } from "@/pages/ClientDetailPage";
 import { MeetingsPage } from "@/pages/MeetingsPage";
 import { AttendancesPage } from "@/pages/AttendancesPage";
 import { ProceduresPage } from "@/pages/ProceduresPage";
@@ -40,7 +41,8 @@ export default function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/clientes" element={<ClientsPage />} />
               <Route path="/clientes/novo" element={<ClientFormPage />} />
-              <Route path="/clientes/:id" element={<ClientFormPage />} />
+              <Route path="/clientes/:id" element={<ClientDetailPage />} />
+              <Route path="/clientes/:id/editar" element={<ClientFormPage />} />
               <Route path="/agenda" element={<MeetingsPage />} />
               <Route path="/atendimentos" element={<AttendancesPage />} />
               <Route path="/procedimentos" element={<ProceduresPage />} />

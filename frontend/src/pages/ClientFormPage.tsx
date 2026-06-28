@@ -332,7 +332,8 @@ export function ClientFormPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      navigate("/clientes");
+      queryClient.invalidateQueries({ queryKey: ["client", id] });
+      navigate(isEdit ? `/clientes/${id}` : "/clientes");
     },
     onError: (err: unknown) => {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -349,7 +350,7 @@ export function ClientFormPage() {
   return (
     <div className="max-w-2xl">
       <button
-        onClick={() => navigate("/clientes")}
+        onClick={() => navigate(isEdit ? `/clientes/${id}` : "/clientes")}
         className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-4 transition-colors"
       >
         <ArrowLeft size={15} />
@@ -466,7 +467,7 @@ export function ClientFormPage() {
             </button>
             <button
               type="button"
-              onClick={() => navigate("/clientes")}
+              onClick={() => navigate(isEdit ? `/clientes/${id}` : "/clientes")}
               className="px-5 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
             >
               Cancelar
@@ -554,7 +555,7 @@ export function ClientFormPage() {
             </button>
             <button
               type="button"
-              onClick={() => navigate("/clientes")}
+              onClick={() => navigate(isEdit ? `/clientes/${id}` : "/clientes")}
               className="px-5 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
             >
               Cancelar
