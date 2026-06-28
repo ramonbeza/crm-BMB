@@ -62,7 +62,7 @@ class Settings(BaseSettings):
 
     # ── Claude / Anthropic API ────────────────────────────────────────────────
     ANTHROPIC_API_KEY: str = ""
-    CLAUDE_MODEL: str = "claude-sonnet-4-5"
+    CLAUDE_MODEL: str = "claude-sonnet-4-6"
 
     # ── Frontend URL (para CORS no Railway) ──────────────────────────────────
     FRONTEND_URL: str = "http://localhost"
