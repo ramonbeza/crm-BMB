@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, User, Briefcase, DollarSign, X, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, User, Briefcase, DollarSign, X, Sparkles, ExternalLink, Copy, Check } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, ChecklistStatus, ProcedureFinancialSummary, FinancialEntryListItem, PaginatedFinancialEntries, EntryTipo, EntryCategory, User as UserType } from "@/types";
 import { formatDate } from "@/lib/utils";
@@ -9,6 +9,131 @@ import { AIDocumentPanel } from "@/components/AIDocumentPanel";
 import { ExtractedDocumentsPanel } from "@/components/ExtractedDocumentsPanel";
 import { WorkflowAssistantPanel } from "@/components/WorkflowAssistantPanel";
 import { useAuthStore } from "@/store/authStore";
+
+// ── CopyButton ────────────────────────────────────────────────────────────────
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  const handle = () => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+  return (
+    <button
+      onClick={handle}
+      title="Copiar"
+      className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 transition-colors ml-1"
+    >
+      {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+    </button>
+  );
+}
+
+// ── PortaisExternosCard ───────────────────────────────────────────────────────
+
+const ONR_LINKS = [
+  {
+    label: "ONR — Acompanhar protocolo",
+    url: "https://www.onr.org.br/acompanhar-protocolo",
+    hint: "Portal nacional de rastreamento de protocolos no cartório",
+  },
+  {
+    label: "ONR — Solicitar certidão",
+    url: "https://www.onr.org.br/certidao",
+    hint: "Pedido eletrônico de certidão de matrícula / ônus reais",
+  },
+  {
+    label: "Arisp (SP) — RI Online",
+    url: "https://www.arisp.com.br/ri/acesso",
+    hint: "Sistema de Registro de Imóveis de SP — acompanhamento e certidões",
+  },
+  {
+    label: "e-Notariado — Consulta",
+    url: "https://www.e-notariado.org.br",
+    hint: "Portal nacional de notas e declarações eletrônicas",
+  },
+];
+
+function PortaisExternosCard({ matricula, incra, inscricaoImobiliaria }: {
+  matricula: string | null;
+  incra: string | null;
+  inscricaoImobiliaria: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasIds = matricula || incra || inscricaoImobiliaria;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5">
+      <button
+        onClick={() => setExpanded((p) => !p)}
+        className="w-full flex items-center justify-between gap-3"
+      >
+        <div className="flex items-center gap-2">
+          <ExternalLink size={16} className="text-gray-400" />
+          <span className="text-sm font-semibold text-gray-700">Portais externos — Cartório / ONR</span>
+        </div>
+        {expanded ? <ChevronUp size={15} className="text-gray-400" /> : <ChevronDown size={15} className="text-gray-400" />}
+      </button>
+
+      {expanded && (
+        <div className="mt-4 space-y-4">
+          {/* Identificadores para copiar */}
+          {hasIds && (
+            <div className="flex flex-wrap gap-x-6 gap-y-2 px-3 py-2.5 bg-gray-50 rounded-lg text-xs text-gray-600">
+              {matricula && (
+                <span className="flex items-center gap-1">
+                  <span className="font-medium text-gray-500">Matrícula:</span>
+                  <span className="font-mono">{matricula}</span>
+                  <CopyButton value={matricula} />
+                </span>
+              )}
+              {inscricaoImobiliaria && (
+                <span className="flex items-center gap-1">
+                  <span className="font-medium text-gray-500">Ins. Imobiliária:</span>
+                  <span className="font-mono">{inscricaoImobiliaria}</span>
+                  <CopyButton value={inscricaoImobiliaria} />
+                </span>
+              )}
+              {incra && (
+                <span className="flex items-center gap-1">
+                  <span className="font-medium text-gray-500">INCRA:</span>
+                  <span className="font-mono">{incra}</span>
+                  <CopyButton value={incra} />
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Links */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {ONR_LINKS.map((link) => (
+              <a
+                key={link.url}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2.5 p-3 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50 transition-colors group"
+              >
+                <ExternalLink size={13} className="text-gray-300 group-hover:text-primary-500 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-700 group-hover:text-primary-700">{link.label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-snug">{link.hint}</p>
+                </div>
+              </a>
+            ))}
+          </div>
+
+          <p className="text-xs text-gray-400 px-1">
+            Copie o número da matrícula acima e cole no campo de busca do portal desejado.
+            Para estados sem sistema ONR, acesse diretamente o site do cartório competente.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── label maps ───────────────────────────────────────────────────────────────
 
@@ -322,6 +447,13 @@ export function ProcedureDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Portais externos */}
+      <PortaisExternosCard
+        matricula={p.matricula}
+        incra={p.incra}
+        inscricaoImobiliaria={p.inscricao_imobiliaria}
+      />
 
       {/* Stages */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
