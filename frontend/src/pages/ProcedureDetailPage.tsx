@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, ChecklistStatus, ProcedureFinancialSummary, FinancialEntryListItem, PaginatedFinancialEntries, EntryTipo, EntryCategory, User as UserType } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { AIDocumentPanel } from "@/components/AIDocumentPanel";
+import { ExtractedDocumentsPanel } from "@/components/ExtractedDocumentsPanel";
 import { useAuthStore } from "@/store/authStore";
 
 // ── label maps ───────────────────────────────────────────────────────────────
@@ -357,6 +358,18 @@ export function ProcedureDetailPage() {
 
       {/* Financeiro */}
       <FinancialPanel procedureId={p.id} />
+
+      {/* Extração de documentos */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6 mt-5">
+        <div className="flex items-center gap-2 mb-5">
+          <div className="p-1.5 bg-blue-50 rounded-lg">
+            <FileText size={16} className="text-blue-600" />
+          </div>
+          <h2 className="text-base font-bold text-gray-900">Documentos</h2>
+          <span className="text-xs bg-primary-50 text-primary-600 px-2 py-0.5 rounded font-medium">IA</span>
+        </div>
+        <ExtractedDocumentsPanel procedureId={p.id} />
+      </div>
 
       {/* IA — Geração de documentos */}
       <div className="bg-white border border-gray-200 rounded-xl p-6 mt-5">
