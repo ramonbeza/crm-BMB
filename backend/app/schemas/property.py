@@ -76,6 +76,8 @@ class PropertyCreate(BaseModel):
     cartorio: str | None = None
     confrontantes: str | None = None
     proprietarios: list[dict[str, Any]] = Field(default_factory=list)
+    quadro_areas_nbr: dict[str, Any] | None = None
+    analise_juridica: dict[str, Any] | None = None
     notas: str | None = None
     owners: list[PropertyClientCreate] = Field(default_factory=list)
 
@@ -110,6 +112,7 @@ class PropertyRead(BaseModel):
     confrontantes: str | None
     proprietarios: list[dict[str, Any]] = Field(default_factory=list)
     quadro_areas_nbr: dict[str, Any] | None = None
+    analise_juridica: dict[str, Any] | None = None
     notas: str | None
     is_active: bool
     created_at: datetime

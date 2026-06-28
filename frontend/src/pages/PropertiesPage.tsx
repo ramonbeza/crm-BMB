@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FileText, Loader2, X, Search, Plus, Trash2 } from "lucide-react";
+import { FileText, Loader2, X, Search, Plus, Trash2, TableProperties, ShieldAlert } from "lucide-react";
 import { api } from "@/lib/api";
 import type { PaginatedProperties } from "@/types";
+import { AnalisePanel, situacaoConfig } from "@/components/AnalisePanel";
+import type { Analise } from "@/components/AnalisePanel";
 
 interface Proprietario {
   nome: string;
@@ -207,33 +209,40 @@ export function PropertiesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
+  const [analise, setAnalise] = useState<Analise | null>(null);
+  const [nbrUnidadesCount, setNbrUnidadesCount] = useState<number | null>(null);
+  const [nbrQuadro, setNbrQuadro] = useState<Record<string, unknown> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleExtract = async (file: File) => {
     setExtracting(true);
     setExtractError(null);
+    setAnalise(null);
+    setNbrQuadro(null);
+    setNbrUnidadesCount(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const { data } = await api.post("/properties/extract-matricula", fd, {
+      const { data } = await api.post("/properties/extract-full", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      const d = data.dados ?? data;
       setForm({
-        matricula: data.matricula ?? "",
-        inscricao_imobiliaria: data.inscricao_imobiliaria ?? "",
-        incra_code: data.incra_code ?? "",
-        property_type: data.property_type ?? "urbano",
-        subtipo: data.subtipo ?? "",
-        endereco: data.endereco ?? "",
-        area_total: data.area_total != null ? String(data.area_total) : "",
-        area_unit: data.area_unit ?? "m2",
-        cartorio: data.cartorio ?? "",
-        confrontantes: data.confrontantes ?? "",
+        matricula: d.matricula ?? "",
+        inscricao_imobiliaria: d.inscricao_imobiliaria ?? "",
+        incra_code: d.incra_code ?? "",
+        property_type: d.property_type ?? "urbano",
+        subtipo: d.subtipo ?? "",
+        endereco: d.endereco ?? "",
+        area_total: d.area_total != null ? String(d.area_total) : "",
+        area_unit: d.area_unit ?? "m2",
+        cartorio: d.cartorio ?? "",
+        confrontantes: d.confrontantes ?? "",
         notas: "",
       });
-      if (Array.isArray(data.proprietarios) && data.proprietarios.length > 0) {
+      if (Array.isArray(d.proprietarios) && d.proprietarios.length > 0) {
         setProprietarios(
-          data.proprietarios.map((p: Record<string, string | null>) => ({
+          d.proprietarios.map((p: Record<string, string | null>) => ({
             nome: p.nome ?? "",
             cpf: p.cpf ?? "",
             cnpj: p.cnpj ?? "",
@@ -244,6 +253,11 @@ export function PropertiesPage() {
             endereco: p.endereco ?? "",
           }))
         );
+      }
+      if (data.analise_juridica) setAnalise(data.analise_juridica);
+      if (data.quadro_areas_nbr?.unidades?.length) {
+        setNbrQuadro(data.quadro_areas_nbr);
+        setNbrUnidadesCount(data.quadro_areas_nbr.unidades.length);
       }
     } catch {
       setExtractError("Não foi possível extrair os dados. Verifique o documento e tente novamente.");
@@ -280,6 +294,8 @@ export function PropertiesPage() {
         cartorio: f.cartorio || null,
         confrontantes: f.confrontantes || null,
         proprietarios: proprietarios.filter((p) => p.nome.trim()),
+        quadro_areas_nbr: nbrQuadro ?? null,
+        analise_juridica: analise ?? null,
         notas: f.notas || null,
         owners: [],
       };
@@ -290,6 +306,9 @@ export function PropertiesPage() {
       setOpen(false);
       setForm(emptyForm());
       setProprietarios([]);
+      setAnalise(null);
+      setNbrQuadro(null);
+      setNbrUnidadesCount(null);
     },
   });
 
@@ -305,7 +324,7 @@ export function PropertiesPage() {
           </p>
         </div>
         <button
-          onClick={() => { setForm(emptyForm()); setProprietarios([]); setExtractError(null); setOpen(true); }}
+          onClick={() => { setForm(emptyForm()); setProprietarios([]); setExtractError(null); setAnalise(null); setNbrQuadro(null); setNbrUnidadesCount(null); setOpen(true); }}
           className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
         >
           Novo Imóvel
@@ -418,7 +437,7 @@ export function PropertiesPage() {
                   Preencher automaticamente com a matrícula
                 </p>
                 <p className="text-xs text-primary-600 mb-3">
-                  Faça upload do PDF ou imagem da matrícula. O Claude IA irá extrair todos os dados, incluindo a qualificação dos proprietários registrais mais recentes.
+                  Uma leitura — tudo de uma vez: dados cadastrais, qualificação dos proprietários, análise jurídica e quadro de áreas NBR (se aplicável).
                 </p>
                 <input
                   ref={fileRef}
@@ -434,10 +453,45 @@ export function PropertiesPage() {
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg"
                 >
                   {extracting ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-                  {extracting ? "Lendo matrícula..." : "Carregar matrícula (PDF ou imagem)"}
+                  {extracting ? "Analisando matrícula (aguarde)..." : "Carregar matrícula (PDF ou imagem)"}
                 </button>
                 {extractError && <p className="text-red-600 text-xs mt-2">{extractError}</p>}
               </div>
+
+              {/* Análise jurídica inline */}
+              {analise && (
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShieldAlert size={15} className="text-primary-500" />
+                    <h3 className="text-sm font-semibold text-gray-800">Análise Jurídica da Matrícula</h3>
+                    <span className="text-xs bg-primary-50 text-primary-600 px-1.5 py-0.5 rounded font-medium">IA</span>
+                    {(() => {
+                      const cfg = situacaoConfig[analise.situacao_geral] ?? situacaoConfig.requer_investigacao;
+                      return (
+                        <span className={`text-xs px-2 py-0.5 rounded border font-medium ml-auto ${cfg.cls}`}>
+                          {cfg.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <AnalisePanel analise={analise} />
+                </div>
+              )}
+
+              {/* Quadro de áreas NBR */}
+              {nbrUnidadesCount != null && nbrUnidadesCount > 0 && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 flex items-center gap-3">
+                  <TableProperties size={16} className="text-green-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800">
+                      Quadro de Áreas NBR 12.721 extraído — {nbrUnidadesCount} unidade{nbrUnidadesCount !== 1 ? "s" : ""}
+                    </p>
+                    <p className="text-xs text-green-600 mt-0.5">
+                      Será salvo automaticamente ao cadastrar. Você pode editar na página do imóvel.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

@@ -129,6 +129,159 @@ Regras:
 - Retorne APENAS o JSON, sem explicações"""
 
 
+_FULL_EXTRACT_PROMPT = """Você é um advogado especialista em Direito Registral Imobiliário e engenheiro com expertise em NBR 12721.
+Analise esta matrícula de imóvel INTEGRALMENTE — todos os registros e averbações — e retorne APENAS um JSON puro (sem markdown) com três seções:
+
+{
+  "dados": {
+    "matricula": "número da matrícula (somente o número)",
+    "inscricao_imobiliaria": "inscrição imobiliária municipal se houver",
+    "incra_code": "código INCRA se for imóvel rural",
+    "property_type": "urbano | rural | rural_urbano",
+    "subtipo": "tipo físico: Apartamento | Casa | Lote urbano | Lote com construção averbada | Sala comercial | Loja | Galpão / armazém | Terreno rural | Terreno rural com benfeitorias | Outro",
+    "endereco": "endereço completo incluindo cidade e UF",
+    "area_total": 0.0,
+    "area_unit": "m2 | ha",
+    "cartorio": "nome completo do cartório de registro de imóveis",
+    "confrontantes": "Norte: ...; Sul: ...; Leste: ...; Oeste: ...",
+    "proprietarios": [
+      {
+        "nome": "nome completo",
+        "cpf": "CPF se PF",
+        "cnpj": "CNPJ se PJ",
+        "nacionalidade": "nacionalidade",
+        "estado_civil": "solteiro | casado | divorciado | viúvo | separado | união estável",
+        "regime_bens": "comunhão parcial | comunhão universal | separação total | participação final nos aquestos | null se solteiro/viúvo",
+        "profissao": "profissão",
+        "endereco": "endereço de qualificação"
+      }
+    ]
+  },
+  "analise_juridica": {
+    "situacao_geral": "regular | com_onus | irregular | requer_investigacao",
+    "nivel_risco": "baixo | medio | alto",
+    "resumo": "parágrafo curto com a situação geral do imóvel",
+    "onus_reais": [
+      {
+        "tipo": "hipoteca | penhora | usufruto | alienacao_fiduciaria | servidao | restricao_legal | outro",
+        "descricao": "descrição detalhada conforme matrícula",
+        "data_registro": "data do registro/averbação se constar",
+        "credor_beneficiario": "nome do credor ou beneficiário se constar",
+        "situacao": "ativo | cancelado | incerto"
+      }
+    ],
+    "historico_transmissoes": [
+      {
+        "ordem": 1,
+        "tipo": "compra e venda | doação | herança | permuta | arrematação | outro",
+        "de": "nome do transmitente",
+        "para": "nome do adquirente",
+        "data": "data da transmissão",
+        "valor": "valor se constar"
+      }
+    ],
+    "inconsistencias": [
+      {
+        "tipo": "area_divergente | confrontantes_imprecisos | proprietario_sem_qualificacao | registro_incompleto | outro",
+        "descricao": "descrição da inconsistência",
+        "gravidade": "baixa | media | alta"
+      }
+    ],
+    "documentos_recomendados": ["certidão de ônus reais atualizada (≤30 dias)"],
+    "recomendacoes": ["recomendação jurídica específica"]
+  },
+  "quadro_areas_nbr": null
+}
+
+ATENÇÃO para quadro_areas_nbr:
+- Retorne null se a matrícula for de imóvel simples (casa, lote, apartamento individual, terreno rural).
+- Retorne o objeto abaixo APENAS se a matrícula se referir a um edifício em condomínio ou incorporação com múltiplas unidades:
+
+{
+  "nome_empreendimento": "nome do empreendimento",
+  "endereco": "endereço",
+  "numero_pavimentos": 0,
+  "total_unidades": 0,
+  "unidades": [
+    {
+      "id_unidade": "101",
+      "tipo": "apartamento | sala_comercial | vaga_garagem | deposito | loja | outro",
+      "descricao": "descrição completa",
+      "pavimento": "1º Pavimento",
+      "area_privativa_real": 0.00,
+      "area_comum_real": 0.00,
+      "area_total_real": 0.00,
+      "area_privativa_equivalente": 0.00,
+      "area_comum_equivalente": 0.00,
+      "area_total_equivalente": 0.00,
+      "fracao_ideal_terreno": null,
+      "coeficiente_proporcionalidade": 1.000,
+      "dormitorios": null,
+      "vagas": null,
+      "observacoes": null
+    }
+  ],
+  "totais": {
+    "area_privativa_real": 0.00,
+    "area_comum_real": 0.00,
+    "area_total_real": 0.00,
+    "area_privativa_equivalente": 0.00,
+    "area_comum_equivalente": 0.00,
+    "area_total_equivalente": 0.00
+  },
+  "observacoes_gerais": null
+}
+
+Regras gerais:
+- Para proprietários, use SEMPRE os dados da averbação/registro mais recente que transferiu a propriedade
+- area_total deve ser número decimal com ponto como separador
+- Se campo não existir no documento, use null
+- Não inclua markdown, blocos de código ou explicações — apenas o JSON"""
+
+
+@router.post("/extract-full")
+async def extract_full_matricula(
+    _: CurrentUser,
+    file: UploadFile = File(...),
+):
+    """Uma única chamada ao Claude: extrai dados do imóvel + análise jurídica + quadro NBR 12721."""
+    if not settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="Claude API não configurada.")
+
+    allowed = {"application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif"}
+    content_type = (file.content_type or "").split(";")[0].strip()
+    if content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Formato não suportado. Envie PDF, JPG ou PNG.")
+
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Arquivo muito grande (máx 20 MB).")
+
+    b64 = base64.standard_b64encode(data).decode()
+    if content_type == "application/pdf":
+        source_block: dict = {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": b64}}
+    else:
+        source_block = {"type": "image", "source": {"type": "base64", "media_type": content_type, "data": b64}}
+
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=180.0)
+    message = client.messages.create(
+        model=settings.CLAUDE_MODEL,
+        max_tokens=8192,
+        messages=[{"role": "user", "content": [source_block, {"type": "text", "text": _FULL_EXTRACT_PROMPT}]}],
+    )
+
+    raw = message.content[0].text.strip()
+    raw = re.sub(r"^```[a-z]*\n?", "", raw)
+    raw = re.sub(r"\n?```$", "", raw)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="Não foi possível interpretar o documento.")
+
+    return result
+
+
 @router.post("/analyze-matricula")
 async def analyze_matricula(
     _: CurrentUser,

@@ -160,6 +160,7 @@ class Property(UUIDMixin, TimestampMixin, Base):
     confrontantes: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     proprietarios: Mapped[list | None] = mapped_column(JSONB, nullable=True, default=list)
     quadro_areas_nbr: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+    analise_juridica: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
     notas: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=True)
     created_by_id: Mapped[str | None] = mapped_column(
