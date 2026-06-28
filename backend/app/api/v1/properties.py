@@ -5,12 +5,13 @@ from typing import Annotated
 from uuid import UUID
 
 import anthropic
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-
+from app.core.pdf_gen import generate_property_pdf
 from app.core.deps import CurrentUser, get_session
 from app.crud.property import (
     add_checklist_item,
@@ -22,6 +23,7 @@ from app.crud.property import (
     update_checklist_item,
     update_property,
 )
+from app.models.procedure import PROCEDURE_TYPE_LABELS, Procedure, ProcedureStatus
 from app.models.property import PROPERTY_TYPE_LABELS, ChecklistItem, Property
 from app.schemas.property import (
     ChecklistItemRead,
@@ -664,6 +666,64 @@ async def update_prop(
     if not prop:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imóvel não encontrado")
     return await update_property(db, db_obj=prop, obj_in=body)
+
+
+@router.get("/{property_id}/pdf")
+async def download_property_pdf(
+    property_id: UUID,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Gera e retorna o relatório completo do imóvel em PDF."""
+    prop = await get_property(db, property_id)
+    if not prop:
+        raise HTTPException(status_code=404, detail="Imóvel não encontrado.")
+
+    result = await db.execute(
+        sa.select(Procedure)
+        .where(Procedure.property_id == property_id)
+        .order_by(Procedure.created_at.desc())
+    )
+    procs = result.scalars().all()
+
+    status_labels = {
+        ProcedureStatus.em_andamento: "Em andamento",
+        ProcedureStatus.concluido: "Concluído",
+        ProcedureStatus.cancelado: "Cancelado",
+    }
+    proc_dicts = [
+        {
+            "protocol": p.protocol,
+            "type_label": PROCEDURE_TYPE_LABELS.get(p.procedure_type, p.procedure_type),
+            "status_label": status_labels.get(p.status, str(p.status)),
+        }
+        for p in procs
+    ]
+
+    pdf_bytes = generate_property_pdf(
+        matricula=prop.matricula,
+        inscricao_imobiliaria=prop.inscricao_imobiliaria,
+        incra_code=prop.incra_code,
+        property_type_label=PROPERTY_TYPE_LABELS.get(prop.property_type, prop.property_type),
+        subtipo=prop.subtipo,
+        endereco=prop.endereco,
+        area_total=prop.area_total,
+        area_unit=prop.area_unit or "m2",
+        cartorio=prop.cartorio,
+        confrontantes=prop.confrontantes,
+        proprietarios=prop.proprietarios or [],
+        analise_juridica=prop.analise_juridica,
+        quadro_areas_nbr=prop.quadro_areas_nbr,
+        procedures=proc_dicts,
+        notas=prop.notas,
+    )
+
+    filename = f"imovel_{prop.matricula or property_id}.pdf".replace(" ", "_").replace("/", "-")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)

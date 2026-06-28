@@ -87,6 +87,16 @@ AI_DOCUMENT_LABELS: dict[str, str] = {
 
 # Documentos sugeridos por tipo de procedimento
 SUGGESTED_DOCS_BY_PROCEDURE: dict[str, list[str]] = {
+    # ── Despachante imobiliário ────────────────────────────────────────────────
+    "transferencia_imovel": ["minuta_escritura", "requerimento", "declaracao", "contrato_honorarios"],
+    "compra_venda": ["minuta_contrato", "minuta_escritura", "declaracao", "contrato_honorarios"],
+    "doacao_imovel": ["minuta_escritura", "declaracao", "contrato_honorarios"],
+    "permuta": ["minuta_contrato", "minuta_escritura", "declaracao", "contrato_honorarios"],
+    "divisao_amigavel": ["formal_partilha", "declaracao_meacao", "minuta_escritura", "procuracao", "contrato_honorarios"],
+    "unificacao_matriculas": ["requerimento", "declaracao", "oficio_cartorio", "contrato_honorarios"],
+    "averbacao": ["requerimento", "declaracao", "oficio_cartorio", "contrato_honorarios"],
+    "regularizacao_imovel": ["requerimento", "declaracao", "oficio_prefeitura", "oficio_cartorio", "contrato_honorarios"],
+    # ── Registral / Notarial ───────────────────────────────────────────────────
     "usucapiao_judicial": ["requerimento_usucapiao", "procuracao", "declaracao", "contrato_honorarios", "parecer"],
     "usucapiao_extrajudicial": ["requerimento_usucapiao", "ata_notarial", "edital_usucapiao", "anuencia_confrontantes", "procuracao", "contrato_honorarios"],
     "retificacao_administrativa": ["requerimento_retificacao", "auto_declaratorio", "anuencia_confrontantes", "procuracao", "contrato_honorarios"],

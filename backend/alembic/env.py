@@ -22,6 +22,7 @@ import app.models.communication  # noqa: F401
 import app.models.integration  # noqa: F401
 import app.models.ai_document  # noqa: F401
 import app.models.audit  # noqa: F401
+import app.models.legal_document  # noqa: F401
 
 target_metadata = Base.metadata
 

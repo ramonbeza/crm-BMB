@@ -10,6 +10,16 @@ from app.db.base import Base, TimestampMixin, UUIDMixin
 
 
 class ProcedureType(str, Enum):
+    # ── Despachante imobiliário ────────────────────────────────────────────────
+    transferencia_imovel = "transferencia_imovel"
+    compra_venda = "compra_venda"
+    doacao_imovel = "doacao_imovel"
+    permuta = "permuta"
+    divisao_amigavel = "divisao_amigavel"
+    unificacao_matriculas = "unificacao_matriculas"
+    averbacao = "averbacao"
+    regularizacao_imovel = "regularizacao_imovel"
+    # ── Registral / Notarial ───────────────────────────────────────────────────
     usucapiao_judicial = "usucapiao_judicial"
     usucapiao_extrajudicial = "usucapiao_extrajudicial"
     retificacao_administrativa = "retificacao_administrativa"
@@ -24,6 +34,16 @@ class ProcedureType(str, Enum):
 
 
 PROCEDURE_TYPE_LABELS: dict[str, str] = {
+    # ── Despachante imobiliário ────────────────────────────────────────────────
+    "transferencia_imovel": "Transferência de Imóvel (ITBI + Escritura + Registro)",
+    "compra_venda": "Compra e Venda",
+    "doacao_imovel": "Doação de Imóvel",
+    "permuta": "Permuta",
+    "divisao_amigavel": "Divisão Amigável",
+    "unificacao_matriculas": "Unificação de Matrículas",
+    "averbacao": "Averbação",
+    "regularizacao_imovel": "Regularização de Imóvel",
+    # ── Registral / Notarial ───────────────────────────────────────────────────
     "usucapiao_judicial": "Usucapião Judicial",
     "usucapiao_extrajudicial": "Usucapião Extrajudicial",
     "retificacao_administrativa": "Retificação Administrativa",

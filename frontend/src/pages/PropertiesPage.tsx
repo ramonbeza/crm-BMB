@@ -218,6 +218,16 @@ export function PropertiesPage() {
   const [analise, setAnalise] = useState<Analise | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/properties/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["properties"] }),
+  });
+
+  const handleDelete = (id: string, label: string) => {
+    if (!window.confirm(`Excluir imóvel "${label}"?\n\nEsta ação não pode ser desfeita.`)) return;
+    deleteMutation.mutate(id);
+  };
+
   const handleExtract = async (file: File) => {
     setExtracting(true);
     setExtractError(null);
@@ -387,6 +397,7 @@ export function PropertiesPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Cartório</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Área</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Procedimentos</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -424,6 +435,18 @@ export function PropertiesPage() {
                     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${p.procedure_count > 0 ? "bg-primary-50 text-primary-700" : "bg-gray-50 text-gray-400"}`}>
                       {p.procedure_count} proc.
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => handleDelete(p.id, p.matricula ?? "sem matrícula")}
+                      disabled={deleteMutation.isPending && deleteMutation.variables === p.id}
+                      className="text-gray-300 hover:text-red-500 disabled:opacity-40 transition-colors"
+                      title="Excluir imóvel"
+                    >
+                      {deleteMutation.isPending && deleteMutation.variables === p.id
+                        ? <Loader2 size={15} className="animate-spin" />
+                        : <Trash2 size={15} />}
+                    </button>
                   </td>
                 </tr>
               ))}

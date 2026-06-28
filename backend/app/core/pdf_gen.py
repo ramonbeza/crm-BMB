@@ -396,3 +396,266 @@ def generate_contract_pdf(
     buf = BytesIO()
     pdf.output(buf)
     return buf.getvalue()
+
+
+# ── Property PDF ───────────────────────────────────────────────────────────────
+
+_SITUACAO_LABEL = {
+    "regular": "Regular",
+    "com_onus": "Com onus",
+    "irregular": "Irregular",
+    "requer_investigacao": "Requer investigacao",
+}
+_RISCO_LABEL = {"baixo": "Baixo", "medio": "Medio", "alto": "Alto"}
+_TIPO_UNIDADE_LABEL = {
+    "apartamento": "Apto",
+    "sala_comercial": "Sala comercial",
+    "vaga_garagem": "Vaga",
+    "deposito": "Deposito",
+    "loja": "Loja",
+    "outro": "Outro",
+}
+
+
+def generate_property_pdf(
+    *,
+    matricula: str | None,
+    inscricao_imobiliaria: str | None,
+    incra_code: str | None,
+    property_type_label: str,
+    subtipo: str | None,
+    endereco: str | None,
+    area_total: float | None,
+    area_unit: str,
+    cartorio: str | None,
+    confrontantes: str | None,
+    proprietarios: list[dict],
+    analise_juridica: dict | None,
+    quadro_areas_nbr: dict | None,
+    procedures: list[dict],
+    notas: str | None,
+) -> bytes:
+    title = f"RELATORIO DO IMOVEL{(' - Mat. ' + matricula) if matricula else ''}"
+    pdf = _BasePDF(_s(title))
+    pdf.alias_nb_pages()
+
+    # ── Dados do Imovel ────────────────────────────────────────────────────────
+    pdf.section_title("Dados do Imovel")
+    if matricula:
+        pdf.key_val("Matricula:", matricula, bold_val=True)
+    if inscricao_imobiliaria:
+        pdf.key_val("Inscricao Imobiliaria:", inscricao_imobiliaria)
+    if incra_code:
+        pdf.key_val("Codigo INCRA:", incra_code)
+    tipo_str = property_type_label + (f" - {_s(subtipo)}" if subtipo else "")
+    pdf.key_val("Tipo:", tipo_str)
+    if endereco:
+        pdf.key_val("Endereco:", endereco)
+    if area_total is not None:
+        unit_str = "ha" if area_unit == "ha" else "m2"
+        pdf.key_val("Area total:", f"{area_total:,.4f} {unit_str}".replace(",", "."))
+    if cartorio:
+        pdf.key_val("Cartorio:", cartorio)
+    pdf.key_val("Data do relatorio:", _today())
+    if confrontantes:
+        pdf.ln(2)
+        pdf.set_text_color(*COLOR_GRAY)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.cell(50, LINE_H, "Confrontantes:", new_x="RIGHT", new_y="TOP")
+        pdf.set_text_color(*COLOR_BLACK)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.multi_cell(0, LINE_H, _s(confrontantes))
+    if notas:
+        pdf.ln(1)
+        pdf.set_text_color(*COLOR_GRAY)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.cell(50, LINE_H, "Observacoes:", new_x="RIGHT", new_y="TOP")
+        pdf.set_text_color(*COLOR_BLACK)
+        pdf.multi_cell(0, LINE_H, _s(notas))
+    pdf.ln(3)
+
+    # ── Proprietarios registrais ───────────────────────────────────────────────
+    if proprietarios:
+        pdf.section_title(f"Proprietarios Registrais ({len(proprietarios)})")
+        for i, p in enumerate(proprietarios, 1):
+            nome = _s(p.get("nome") or "")
+            if not nome:
+                continue
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*COLOR_BLACK)
+            pdf.cell(0, LINE_H, f"{i}. {nome}", new_x="LMARGIN", new_y="NEXT")
+            details = []
+            if p.get("cpf"):
+                details.append(f"CPF: {p['cpf']}")
+            if p.get("cnpj"):
+                details.append(f"CNPJ: {p['cnpj']}")
+            if p.get("nacionalidade"):
+                details.append(_s(p["nacionalidade"]))
+            if p.get("estado_civil"):
+                ec = _s(p["estado_civil"])
+                if p.get("regime_bens"):
+                    ec += f" / {_s(p['regime_bens'])}"
+                details.append(ec)
+            if p.get("profissao"):
+                details.append(_s(p["profissao"]))
+            if details:
+                pdf.set_font("Helvetica", "", 7)
+                pdf.set_text_color(*COLOR_GRAY)
+                pdf.set_x(MARGIN + 4)
+                pdf.cell(0, 5, "   ".join(details), new_x="LMARGIN", new_y="NEXT")
+            if p.get("endereco"):
+                pdf.set_font("Helvetica", "", 7)
+                pdf.set_text_color(*COLOR_GRAY)
+                pdf.set_x(MARGIN + 4)
+                pdf.cell(0, 5, _s(p["endereco"]), new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(1)
+        pdf.ln(2)
+
+    # ── Analise Juridica ───────────────────────────────────────────────────────
+    if analise_juridica:
+        aj = analise_juridica
+        situacao = _SITUACAO_LABEL.get(aj.get("situacao_geral", ""), "Nao informada")
+        risco = _RISCO_LABEL.get(aj.get("nivel_risco", ""), "Nao informado")
+        pdf.section_title("Analise Juridica da Matricula")
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(*COLOR_PRIMARY)
+        pdf.cell(0, 7, f"Situacao: {_s(situacao)}   |   Risco: {_s(risco)}", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1)
+        if aj.get("resumo"):
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(*COLOR_BLACK)
+            pdf.multi_cell(0, LINE_H, _s(aj["resumo"]))
+            pdf.ln(2)
+        onus = aj.get("onus_reais") or []
+        if onus:
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*COLOR_GRAY)
+            pdf.cell(0, 6, f"Onus e Gravames ({len(onus)}):", new_x="LMARGIN", new_y="NEXT")
+            for o in onus:
+                tipo_o = _s(o.get("tipo", "")).replace("_", " ").title()
+                sit_o = _s(o.get("situacao", ""))
+                pdf.set_font("Helvetica", "B", 7)
+                pdf.set_text_color(*COLOR_BLACK)
+                pdf.set_x(MARGIN + 4)
+                pdf.cell(0, 5, f"- {tipo_o} [{sit_o}]", new_x="LMARGIN", new_y="NEXT")
+                if o.get("descricao"):
+                    pdf.set_font("Helvetica", "", 7)
+                    pdf.set_text_color(*COLOR_GRAY)
+                    pdf.set_x(MARGIN + 8)
+                    pdf.multi_cell(0, 4, _s(o["descricao"]))
+                if o.get("credor_beneficiario"):
+                    pdf.set_font("Helvetica", "I", 7)
+                    pdf.set_x(MARGIN + 8)
+                    pdf.cell(0, 4, f"Credor: {_s(o['credor_beneficiario'])}", new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+        incs = aj.get("inconsistencias") or []
+        if incs:
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*COLOR_GRAY)
+            pdf.cell(0, 6, f"Inconsistencias ({len(incs)}):", new_x="LMARGIN", new_y="NEXT")
+            for inc in incs:
+                grav = _s(inc.get("gravidade", "")).upper()
+                tipo_i = _s(inc.get("tipo", "")).replace("_", " ").title()
+                pdf.set_font("Helvetica", "B", 7)
+                pdf.set_text_color(*COLOR_BLACK)
+                pdf.set_x(MARGIN + 4)
+                pdf.cell(0, 5, f"- [{grav}] {tipo_i}", new_x="LMARGIN", new_y="NEXT")
+                if inc.get("descricao"):
+                    pdf.set_font("Helvetica", "", 7)
+                    pdf.set_text_color(*COLOR_GRAY)
+                    pdf.set_x(MARGIN + 8)
+                    pdf.multi_cell(0, 4, _s(inc["descricao"]))
+            pdf.ln(2)
+        recs = aj.get("recomendacoes") or []
+        docs_rec = aj.get("documentos_recomendados") or []
+        if recs or docs_rec:
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*COLOR_GRAY)
+            pdf.cell(0, 6, "Recomendacoes:", new_x="LMARGIN", new_y="NEXT")
+            for r in recs:
+                pdf.set_font("Helvetica", "", 7)
+                pdf.set_text_color(*COLOR_BLACK)
+                pdf.set_x(MARGIN + 4)
+                pdf.multi_cell(0, 4, f"-> {_s(r)}")
+            for d in docs_rec:
+                pdf.set_font("Helvetica", "", 7)
+                pdf.set_text_color(*COLOR_GRAY)
+                pdf.set_x(MARGIN + 4)
+                pdf.cell(0, 4, f"- {_s(d)}", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(3)
+
+    # ── Quadro de Areas NBR 12721 ──────────────────────────────────────────────
+    quadro = quadro_areas_nbr
+    if quadro and quadro.get("unidades"):
+        unidades = quadro["unidades"]
+        pdf.section_title(f"Quadro de Areas NBR 12.721 ({len(unidades)} unidade(s))")
+        if quadro.get("nome_empreendimento"):
+            pdf.key_val("Empreendimento:", quadro["nome_empreendimento"])
+        if quadro.get("endereco"):
+            pdf.key_val("Endereco do empreendimento:", quadro["endereco"])
+        pdf.ln(2)
+
+        col_w = [14, 18, 40, 23, 23, 23, 16]
+        headers = ["Unid.", "Tipo", "Descricao", "A.Priv.(m2)", "A.Com.(m2)", "A.Tot.(m2)", "Fracao"]
+        pdf.set_fill_color(*COLOR_PRIMARY)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 6)
+        for i, h in enumerate(headers):
+            pdf.cell(col_w[i], 6, h, align="R" if i >= 3 else "L", fill=True, new_x="RIGHT", new_y="TOP")
+        pdf.ln(6)
+
+        def _fa(v):
+            if v is None: return "-"
+            try: return f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            except: return "-"
+
+        for idx, u in enumerate(unidades):
+            fill = idx % 2 == 0
+            if fill:
+                pdf.set_fill_color(*COLOR_LIGHT)
+            pdf.set_text_color(*COLOR_BLACK)
+            pdf.set_font("Helvetica", "", 6)
+            row = [
+                _s(u.get("id_unidade") or ""),
+                _s(_TIPO_UNIDADE_LABEL.get(u.get("tipo", ""), u.get("tipo", ""))),
+                _s(u.get("descricao") or ""),
+                _fa(u.get("area_privativa_real")),
+                _fa(u.get("area_comum_real")),
+                _fa(u.get("area_total_real")),
+                _s(u.get("fracao_ideal_terreno") or "-"),
+            ]
+            aligns = ["L", "L", "L", "R", "R", "R", "C"]
+            for i, val in enumerate(row):
+                pdf.cell(col_w[i], 5, val, align=aligns[i], fill=fill, new_x="RIGHT", new_y="TOP")
+            pdf.ln(5)
+
+        totais = quadro.get("totais") or {}
+        pdf.set_fill_color(*COLOR_PRIMARY)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 6)
+        tot_row = ["", "", "TOTAIS", _fa(totais.get("area_privativa_real")),
+                   _fa(totais.get("area_comum_real")), _fa(totais.get("area_total_real")), ""]
+        for i, val in enumerate(tot_row):
+            pdf.cell(col_w[i], 6, val, fill=True, align="R" if i >= 3 else "L", new_x="RIGHT", new_y="TOP")
+        pdf.ln(8)
+
+    # ── Procedimentos vinculados ───────────────────────────────────────────────
+    if procedures:
+        pdf.section_title(f"Procedimentos Vinculados ({len(procedures)})")
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.set_text_color(*COLOR_GRAY)
+        pdf.cell(42, 6, "Protocolo", new_x="RIGHT", new_y="TOP")
+        pdf.cell(90, 6, "Tipo", new_x="RIGHT", new_y="TOP")
+        pdf.cell(0, 6, "Status", new_x="LMARGIN", new_y="NEXT")
+        pdf.divider()
+        for proc in procedures:
+            pdf.set_font("Helvetica", "", 7)
+            pdf.set_text_color(*COLOR_BLACK)
+            pdf.cell(42, 5, _s(proc.get("protocol") or ""), new_x="RIGHT", new_y="TOP")
+            pdf.cell(90, 5, _s(proc.get("type_label") or ""), new_x="RIGHT", new_y="TOP")
+            pdf.cell(0, 5, _s(proc.get("status_label") or ""), new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(3)
+
+    prop_pdf_buf = BytesIO()
+    pdf.output(prop_pdf_buf)
+    return prop_pdf_buf.getvalue()

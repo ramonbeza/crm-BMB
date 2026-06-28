@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Users, LayoutDashboard, LogOut, UserCircle2, Calendar, ClipboardList, FolderOpen, Building2, Receipt, FileCheck, Wallet, MessageSquare, BarChart2, Clock, Plug, UserCog } from "lucide-react";
+import { Users, LayoutDashboard, LogOut, UserCircle2, Calendar, ClipboardList, FolderOpen, Building2, Receipt, FileCheck, Wallet, MessageSquare, BarChart2, Clock, Plug, Scale, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
   { to: "/prazos", label: "Prazos", icon: Clock, allowedRoles: ["admin", "advogado", "estagiario"] },
   { to: "/relatorios", label: "Relatórios", icon: BarChart2, allowedRoles: ["admin", "advogado", "estagiario"] },
   { to: "/integracoes", label: "Integrações", icon: Plug, allowedRoles: ["admin", "advogado", "estagiario"] },
+  { to: "/legislacao", label: "Legislação", icon: Scale, allowedRoles: ["admin", "advogado", "estagiario"] },
   { to: "/usuarios", label: "Usuários", icon: UserCog, allowedRoles: ["admin"] },
 ];
 

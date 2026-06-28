@@ -20,6 +20,7 @@ import { ComunicacoesPage } from "@/pages/ComunicacoesPage";
 import { PrazosPage } from "@/pages/PrazosPage";
 import { RelatoriosPage } from "@/pages/RelatoriosPage";
 import { IntegracoesPage } from "@/pages/IntegracoesPage";
+import { LegislacaoPage } from "@/pages/LegislacaoPage";
 import { UsersPage } from "@/pages/UsersPage";
 
 const queryClient = new QueryClient({
@@ -55,6 +56,7 @@ export default function App() {
               <Route path="/prazos" element={<PrazosPage />} />
               <Route path="/relatorios" element={<RelatoriosPage />} />
               <Route path="/integracoes" element={<IntegracoesPage />} />
+              <Route path="/legislacao" element={<LegislacaoPage />} />
               <Route path="/usuarios" element={<UsersPage />} />
             </Route>
           </Route>

@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertCircle, ArrowLeft, Building2, FileText,
+  AlertCircle, ArrowLeft, Building2, Download, FileText,
   FolderOpen, Loader2, ShieldAlert,
   TableProperties, Plus, Trash2, Save, Upload,
 } from "lucide-react";
@@ -408,6 +408,31 @@ export function PropertyDetailPage() {
 
   const accessToken = useAuthStore((s) => s.accessToken);
   const [streamText, setStreamText] = useState("");
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!id || !accessToken) return;
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/properties/${id}/pdf`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) throw new Error("Erro ao gerar PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      a.download = match?.[1] ?? `imovel_${id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Não foi possível gerar o PDF.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const { data: prop, isLoading } = useQuery<Property>({
     queryKey: ["property", id],
@@ -504,6 +529,15 @@ export function PropertyDetailPage() {
               </span>
             )}
           </div>
+          <button
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium rounded-lg"
+            title="Baixar relatório completo em PDF"
+          >
+            {downloadingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+            {downloadingPdf ? "Gerando..." : "Baixar PDF"}
+          </button>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3">
