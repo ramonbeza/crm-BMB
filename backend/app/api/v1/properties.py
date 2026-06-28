@@ -171,6 +171,129 @@ async def analyze_matricula(
     return result
 
 
+_NBR_PROMPT = """Você é um engenheiro e especialista em NBR 12721 (Avaliação de custos unitários e preparo de orçamento de construção para incorporação de edifício em condomínio).
+Analise as plantas, memoriais e documentos fornecidos e extraia o quadro de áreas conforme a NBR 12721, retornando APENAS JSON puro (sem markdown).
+
+{
+  "nome_empreendimento": "nome do empreendimento se constar",
+  "endereco": "endereço do empreendimento",
+  "numero_pavimentos": 0,
+  "total_unidades": 0,
+  "unidades": [
+    {
+      "id_unidade": "identificador único da unidade (ex: 101, Vaga 01, Depósito 01)",
+      "tipo": "apartamento | sala_comercial | vaga_garagem | deposito | loja | outro",
+      "descricao": "descrição completa (ex: Apartamento 101 - 1º Pavimento)",
+      "pavimento": "pavimento onde se localiza (ex: 1º Pavimento, Subsolo)",
+      "area_privativa_real": 0.00,
+      "area_comum_real": 0.00,
+      "area_total_real": 0.00,
+      "area_privativa_equivalente": 0.00,
+      "area_comum_equivalente": 0.00,
+      "area_total_equivalente": 0.00,
+      "fracao_ideal_terreno": "fração ideal do terreno (ex: 1/100 ou 0.0100 ou null se não constar)",
+      "coeficiente_proporcionalidade": 1.000,
+      "dormitorios": null,
+      "vagas": null,
+      "observacoes": null
+    }
+  ],
+  "totais": {
+    "area_privativa_real": 0.00,
+    "area_comum_real": 0.00,
+    "area_total_real": 0.00,
+    "area_privativa_equivalente": 0.00,
+    "area_comum_equivalente": 0.00,
+    "area_total_equivalente": 0.00
+  },
+  "observacoes_gerais": "observações relevantes sobre o quadro de áreas"
+}
+
+Regras importantes:
+- Extraia TODAS as unidades autônomas (apartamentos, vagas, depósitos, lojas, etc.)
+- Área real = área conforme medição física (planta)
+- Área equivalente = área real × coeficiente de equivalência construtiva (se não constar, use null)
+- Se a planta não discriminar área comum por unidade, calcule pela fração ideal se disponível
+- area_total_real = area_privativa_real + area_comum_real
+- Use ponto (.) como separador decimal
+- Se um valor não constar no documento, use null
+- Retorne APENAS o JSON, sem explicações adicionais"""
+
+
+@router.post("/{property_id}/extract-nbr-areas")
+async def extract_nbr_areas(
+    property_id: UUID,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+    files: list[UploadFile] = File(...),
+):
+    """Extrai quadro de áreas NBR 12721 a partir de plantas e documentos."""
+    if not settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="Claude API não configurada.")
+
+    prop = await get_property(db, property_id)
+    if not prop:
+        raise HTTPException(status_code=404, detail="Imóvel não encontrado.")
+
+    if not files:
+        raise HTTPException(status_code=400, detail="Envie ao menos um arquivo.")
+
+    allowed = {"application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif"}
+    content_blocks: list[dict] = []
+
+    for file in files:
+        content_type = (file.content_type or "").split(";")[0].strip()
+        if content_type not in allowed:
+            raise HTTPException(status_code=400, detail=f"Formato não suportado: {file.filename}")
+        data = await file.read()
+        if len(data) > 20 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"Arquivo muito grande: {file.filename} (máx 20 MB).")
+        b64 = base64.standard_b64encode(data).decode()
+        if content_type == "application/pdf":
+            content_blocks.append({"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": b64}})
+        else:
+            content_blocks.append({"type": "image", "source": {"type": "base64", "media_type": content_type, "data": b64}})
+
+    content_blocks.append({"type": "text", "text": _NBR_PROMPT})
+
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=180.0)
+    message = client.messages.create(
+        model=settings.CLAUDE_MODEL,
+        max_tokens=8192,
+        messages=[{"role": "user", "content": content_blocks}],
+    )
+
+    raw = message.content[0].text.strip()
+    raw = re.sub(r"^```[a-z]*\n?", "", raw)
+    raw = re.sub(r"\n?```$", "", raw)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="Não foi possível extrair o quadro de áreas.")
+
+    return result
+
+
+@router.put("/{property_id}/nbr-areas")
+async def save_nbr_areas(
+    property_id: UUID,
+    body: dict,
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Salva o quadro de áreas NBR 12721 no imóvel."""
+    prop = await get_property(db, property_id)
+    if not prop:
+        raise HTTPException(status_code=404, detail="Imóvel não encontrado.")
+    prop.quadro_areas_nbr = body
+    await db.commit()
+    await db.refresh(prop)
+    from app.crud.property import _to_read, _count_procedures
+    count = await _count_procedures(db, property_id)
+    return _to_read(prop, count)
+
+
 @router.post("/extract-matricula")
 async def extract_matricula(
     _: CurrentUser,

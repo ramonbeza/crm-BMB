@@ -109,6 +109,7 @@ class PropertyRead(BaseModel):
     cartorio: str | None
     confrontantes: str | None
     proprietarios: list[dict[str, Any]] = Field(default_factory=list)
+    quadro_areas_nbr: dict[str, Any] | None = None
     notas: str | None
     is_active: bool
     created_at: datetime

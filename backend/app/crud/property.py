@@ -53,6 +53,7 @@ def _to_read(prop: Property, procedure_count: int = 0) -> dict:
         "cartorio": prop.cartorio,
         "confrontantes": prop.confrontantes,
         "proprietarios": prop.proprietarios or [],
+        "quadro_areas_nbr": prop.quadro_areas_nbr,
         "notas": prop.notas,
         "is_active": prop.is_active,
         "created_at": prop.created_at,
