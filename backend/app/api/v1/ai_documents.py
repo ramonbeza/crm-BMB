@@ -7,7 +7,7 @@ import uuid
 from typing import Annotated, Any
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,11 +113,56 @@ async def list_doc_types(_: CurrentUser) -> list[dict[str, str]]:
     return [{"value": k, "label": v} for k, v in AI_DOCUMENT_LABELS.items()]
 
 
+async def _run_generation(doc_id: str, doc_type: str, context: dict) -> None:
+    """Executa a geração de documento em background no próprio processo FastAPI."""
+    import re
+    import anthropic
+    from app.core.config import settings
+    from app.db.session import AsyncSessionLocal
+    from app.worker.ai_prompts import SYSTEM_PROMPT, build_prompt
+
+    async with AsyncSessionLocal() as session:
+        doc = await session.get(AIDocument, uuid.UUID(doc_id))
+        if not doc:
+            return
+        doc.status = AIDocumentStatus.GENERATING
+        await session.commit()
+
+        try:
+            if not settings.ANTHROPIC_API_KEY:
+                raise ValueError("ANTHROPIC_API_KEY não configurado")
+
+            client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=120.0)
+            user_prompt = build_prompt(doc_type, context)
+
+            message = client.messages.create(
+                model=settings.CLAUDE_MODEL,
+                max_tokens=4096,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+
+            content = message.content[0].text if message.content else ""
+            doc.status = AIDocumentStatus.DONE
+            doc.content = content
+            doc.model_used = settings.CLAUDE_MODEL
+            doc.tokens_input = message.usage.input_tokens
+            doc.tokens_output = message.usage.output_tokens
+            doc.prompt_used = user_prompt
+
+        except Exception as exc:
+            doc.status = AIDocumentStatus.FAILED
+            doc.error_message = str(exc)
+
+        await session.commit()
+
+
 @router.post("/procedures/{procedure_id}/generate", summary="Solicita geração de documento por IA")
 async def generate_document(
     procedure_id: uuid.UUID,
     req: GenerateRequest,
     current_user: CurrentUser,
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> AIDocRead:
     """Cria um registro AIDocument e dispara a task Celery de geração."""
@@ -177,9 +222,8 @@ async def generate_document(
     await db.commit()
     await db.refresh(doc)
 
-    # Dispara task Celery
-    from app.worker.tasks import generate_ai_document
-    generate_ai_document.delay(str(doc.id), req.doc_type, context)
+    # Dispara geração em background (sem depender do worker Celery)
+    background_tasks.add_task(_run_generation, str(doc.id), req.doc_type, context)
 
     return AIDocRead.from_orm(doc)
 
