@@ -77,6 +77,100 @@ Regras:
 - Retorne APENAS o JSON, sem explicações"""
 
 
+_ANALYZE_PROMPT = """Você é um advogado especialista em Direito Registral Imobiliário brasileiro.
+Analise esta matrícula de imóvel integralmente — incluindo todos os registros e averbações — e produza um parecer jurídico estruturado em formato JSON puro (sem markdown).
+
+{
+  "situacao_geral": "regular | com_onus | irregular | requer_investigacao",
+  "nivel_risco": "baixo | medio | alto",
+  "resumo": "parágrafo curto com a situação geral do imóvel",
+  "onus_reais": [
+    {
+      "tipo": "hipoteca | penhora | usufruto | alienacao_fiduciaria | servidao | restricao_legal | outro",
+      "descricao": "descrição detalhada conforme matrícula",
+      "data_registro": "data do registro/averbação se constar",
+      "credor_beneficiario": "nome do credor ou beneficiário se constar",
+      "situacao": "ativo | cancelado | incerto"
+    }
+  ],
+  "historico_transmissoes": [
+    {
+      "ordem": 1,
+      "tipo": "compra e venda | doação | herança | permuta | arrematação | outro",
+      "de": "nome do transmitente",
+      "para": "nome do adquirente",
+      "data": "data da transmissão",
+      "valor": "valor se constar"
+    }
+  ],
+  "inconsistencias": [
+    {
+      "tipo": "area_divergente | confrontantes_imprecisos | proprietario_sem_qualificacao | registro_incompleto | outro",
+      "descricao": "descrição da inconsistência identificada",
+      "gravidade": "baixa | media | alta"
+    }
+  ],
+  "documentos_recomendados": [
+    "certidão de ônus reais atualizada (≤30 dias)",
+    "outros documentos específicos recomendados para o caso"
+  ],
+  "recomendacoes": [
+    "recomendação jurídica específica baseada na análise"
+  ]
+}
+
+Regras:
+- Analise TODOS os registros e averbações, não apenas os mais recentes
+- Se não houver ônus, transmissões ou inconsistências, retorne listas vazias []
+- situacao_geral "regular" = sem ônus ativos e transmissões em ordem
+- situacao_geral "com_onus" = há ônus ativos (hipoteca, penhora, etc.)
+- situacao_geral "irregular" = problemas graves que impedem negócios
+- situacao_geral "requer_investigacao" = há dúvidas que precisam de apuração
+- Retorne APENAS o JSON, sem explicações"""
+
+
+@router.post("/analyze-matricula")
+async def analyze_matricula(
+    _: CurrentUser,
+    file: UploadFile = File(...),
+):
+    if not settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="Claude API não configurada.")
+
+    allowed = {"application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif"}
+    content_type = (file.content_type or "").split(";")[0].strip()
+    if content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Formato não suportado. Envie PDF, JPG ou PNG.")
+
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Arquivo muito grande (máx 20 MB).")
+
+    b64 = base64.standard_b64encode(data).decode()
+    if content_type == "application/pdf":
+        source_block: dict = {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": b64}}
+    else:
+        source_block = {"type": "image", "source": {"type": "base64", "media_type": content_type, "data": b64}}
+
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=120.0)
+    message = client.messages.create(
+        model=settings.CLAUDE_MODEL,
+        max_tokens=4096,
+        messages=[{"role": "user", "content": [source_block, {"type": "text", "text": _ANALYZE_PROMPT}]}],
+    )
+
+    raw = message.content[0].text.strip()
+    raw = re.sub(r"^```[a-z]*\n?", "", raw)
+    raw = re.sub(r"\n?```$", "", raw)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="Não foi possível gerar a análise.")
+
+    return result
+
+
 @router.post("/extract-matricula")
 async def extract_matricula(
     _: CurrentUser,
