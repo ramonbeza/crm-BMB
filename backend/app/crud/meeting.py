@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.crud.base import CRUDBase
 from app.models.client import Client, ClientType
-from app.models.meeting import Meeting
+from app.models.meeting import MEETING_CATEGORY_LABELS, Meeting
 from app.models.user import User
 from app.schemas.meeting import MeetingCreate, MeetingRead, MeetingUpdate, PaginatedMeetings
 
@@ -40,6 +40,8 @@ class CRUDMeeting(CRUDBase[Meeting]):
             id=m.id,
             client_id=m.client_id,
             user_id=m.user_id,
+            meeting_category=m.meeting_category,
+            meeting_category_label=MEETING_CATEGORY_LABELS.get(m.meeting_category),
             scheduled_at=m.scheduled_at,
             reception_type=m.reception_type,
             subject=m.subject,
@@ -47,7 +49,7 @@ class CRUDMeeting(CRUDBase[Meeting]):
             status=m.status,
             created_at=m.created_at,
             updated_at=m.updated_at,
-            client_name=_client_display(m.client),
+            client_name=_client_display(m.client) if m.client else None,
             user_name=m.user.name if m.user else None,
         )
 
@@ -57,6 +59,7 @@ class CRUDMeeting(CRUDBase[Meeting]):
         m = Meeting(
             client_id=obj_in.client_id,
             user_id=obj_in.user_id,
+            meeting_category=obj_in.meeting_category,
             scheduled_at=obj_in.scheduled_at,
             reception_type=obj_in.reception_type,
             subject=obj_in.subject,
@@ -71,7 +74,7 @@ class CRUDMeeting(CRUDBase[Meeting]):
     async def update_meeting(
         self, db: AsyncSession, *, db_obj: Meeting, obj_in: MeetingUpdate
     ) -> MeetingRead:
-        for field in ("client_id", "user_id", "scheduled_at", "reception_type", "subject", "summary", "status"):
+        for field in ("client_id", "user_id", "meeting_category", "scheduled_at", "reception_type", "subject", "summary", "status"):
             val = getattr(obj_in, field)
             if val is not None:
                 setattr(db_obj, field, val)

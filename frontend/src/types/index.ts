@@ -82,13 +82,24 @@ export interface PaginatedClients {
 
 // ── Sprint 2: Agenda & Atendimentos ──────────────────────────────────────────
 
-export type ReceptionType = "presencial" | "email" | "whatsapp";
+export type ReceptionType = "presencial" | "email" | "whatsapp" | "videochamada";
 export type MeetingStatus = "agendada" | "realizada" | "cancelada";
+export type MeetingCategory =
+  | "reuniao_cliente"
+  | "audiencia"
+  | "cartorio"
+  | "prefeitura"
+  | "reuniao_interna"
+  | "visita_imovel"
+  | "prazo"
+  | "outro";
 
 export interface Meeting {
   id: string;
-  client_id: string;
+  client_id: string | null;
   user_id: string | null;
+  meeting_category: MeetingCategory;
+  meeting_category_label: string | null;
   scheduled_at: string;
   reception_type: ReceptionType;
   subject: string;

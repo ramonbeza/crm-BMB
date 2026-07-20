@@ -13,6 +13,7 @@ class ReceptionType(str, Enum):
     presencial = "presencial"
     email = "email"
     whatsapp = "whatsapp"
+    videochamada = "videochamada"
 
 
 class MeetingStatus(str, Enum):
@@ -21,12 +22,38 @@ class MeetingStatus(str, Enum):
     cancelada = "cancelada"
 
 
+class MeetingCategory(str, Enum):
+    reuniao_cliente = "reuniao_cliente"
+    audiencia = "audiencia"
+    cartorio = "cartorio"
+    prefeitura = "prefeitura"
+    reuniao_interna = "reuniao_interna"
+    visita_imovel = "visita_imovel"
+    prazo = "prazo"
+    outro = "outro"
+
+
+MEETING_CATEGORY_LABELS: dict[str, str] = {
+    "reuniao_cliente": "Reunião com Cliente",
+    "audiencia": "Audiência / Sessão",
+    "cartorio": "Diligência em Cartório",
+    "prefeitura": "Diligência na Prefeitura",
+    "reuniao_interna": "Reunião Interna",
+    "visita_imovel": "Visita ao Imóvel",
+    "prazo": "Prazo / Vencimento",
+    "outro": "Outro",
+}
+
+
 class Meeting(Base, UUIDMixin, TimestampMixin):
-    """Agenda — reuniões com clientes."""
+    """Agenda — reuniões e compromissos do escritório."""
     __tablename__ = "meetings"
 
-    client_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False, index=True
+    client_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clients.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    meeting_category: Mapped[str] = mapped_column(
+        String(30), nullable=False, default=MeetingCategory.reuniao_cliente
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True

@@ -8,10 +8,45 @@ import type { EventClickArg } from "@fullcalendar/core";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Calendar, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Meeting, PaginatedMeetings, PaginatedClients, ReceptionType, MeetingStatus } from "@/types";
+import type {
+  Meeting,
+  MeetingCategory,
+  MeetingStatus,
+  PaginatedClients,
+  PaginatedMeetings,
+  ReceptionType,
+} from "@/types";
+
+// ── category config ────────────────────────────────────────────────────────────
+
+interface CategoryConfig {
+  label: string;
+  color: string;        // calendar event color
+  needsClient: boolean; // show & require client picker
+}
+
+const CATEGORIES: Record<MeetingCategory, CategoryConfig> = {
+  reuniao_cliente:  { label: "Reunião com Cliente",      color: "#2563eb", needsClient: true  },
+  audiencia:        { label: "Audiência / Sessão",        color: "#7c3aed", needsClient: false },
+  cartorio:         { label: "Diligência em Cartório",    color: "#0891b2", needsClient: false },
+  prefeitura:       { label: "Diligência na Prefeitura",  color: "#0d9488", needsClient: false },
+  reuniao_interna:  { label: "Reunião Interna",           color: "#4f46e5", needsClient: false },
+  visita_imovel:    { label: "Visita ao Imóvel",          color: "#ea580c", needsClient: true  },
+  prazo:            { label: "Prazo / Vencimento",        color: "#dc2626", needsClient: false },
+  outro:            { label: "Outro",                     color: "#6b7280", needsClient: false },
+};
+
+const STATUS_DIM: Record<MeetingStatus, number> = {
+  agendada: 1,
+  realizada: 0.55,
+  cancelada: 0.3,
+};
+
+// ── form state ─────────────────────────────────────────────────────────────────
 
 interface FormState {
   id?: string;
+  meeting_category: MeetingCategory;
   client_id: string;
   scheduled_at: string;
   reception_type: ReceptionType;
@@ -22,6 +57,7 @@ interface FormState {
 }
 
 const emptyForm = (date?: string): FormState => ({
+  meeting_category: "reuniao_cliente",
   client_id: "",
   scheduled_at: date ? `${date}T09:00` : "",
   reception_type: "presencial",
@@ -31,11 +67,7 @@ const emptyForm = (date?: string): FormState => ({
   google_event_id: null,
 });
 
-const statusColor: Record<MeetingStatus, string> = {
-  agendada: "#2563eb",
-  realizada: "#16a34a",
-  cancelada: "#9ca3af",
-};
+// ── MeetingsPage ───────────────────────────────────────────────────────────────
 
 export function MeetingsPage() {
   const qc = useQueryClient();
@@ -54,13 +86,16 @@ export function MeetingsPage() {
     queryKey: ["clients-picker", clientSearch],
     queryFn: async () =>
       (await api.get<PaginatedClients>(`/clients?page_size=10&search=${encodeURIComponent(clientSearch)}`)).data,
-    enabled: open,
+    enabled: open && CATEGORIES[form.meeting_category].needsClient,
   });
+
+  const catCfg = CATEGORIES[form.meeting_category];
 
   const save = useMutation({
     mutationFn: async (f: FormState) => {
       const payload = {
-        client_id: f.client_id,
+        meeting_category: f.meeting_category,
+        client_id: catCfg.needsClient && f.client_id ? f.client_id : null,
         scheduled_at: new Date(f.scheduled_at).toISOString(),
         reception_type: f.reception_type,
         subject: f.subject,
@@ -100,7 +135,6 @@ export function MeetingsPage() {
     },
     onSuccess: (data) => {
       setSyncMsg(`Sincronizado! Ver no Google Calendar: ${data.html_link ?? data.google_event_id}`);
-      // Atualiza o form para refletir que foi sincronizado (botão fica verde)
       if (data.google_event_id) {
         setForm((f) => ({ ...f, google_event_id: data.google_event_id }));
       }
@@ -124,14 +158,24 @@ export function MeetingsPage() {
 
   const events = useMemo(
     () =>
-      (meetings?.items ?? []).map((m: Meeting) => ({
-        id: m.id,
-        title: `${m.subject}${m.client_name ? " — " + m.client_name : ""}`,
-        start: m.scheduled_at,
-        backgroundColor: statusColor[m.status],
-        borderColor: statusColor[m.status],
-        extendedProps: { meeting: m },
-      })),
+      (meetings?.items ?? []).map((m: Meeting) => {
+        const cfg = CATEGORIES[m.meeting_category] ?? CATEGORIES.outro;
+        const opacity = STATUS_DIM[m.status] ?? 1;
+        const title = m.client_name
+          ? `${m.subject} — ${m.client_name}`
+          : m.meeting_category_label
+          ? `[${m.meeting_category_label}] ${m.subject}`
+          : m.subject;
+        return {
+          id: m.id,
+          title,
+          start: m.scheduled_at,
+          backgroundColor: cfg.color,
+          borderColor: cfg.color,
+          opacity,
+          extendedProps: { meeting: m },
+        };
+      }),
     [meetings]
   );
 
@@ -139,15 +183,18 @@ export function MeetingsPage() {
     setForm(emptyForm(date));
     setClientSearch("");
     setSaveError(null);
+    setSyncMsg("");
     setOpen(true);
   };
 
   const openEdit = (m: Meeting) => {
     setSaveError(null);
+    setSyncMsg("");
     setConfirmDelete(false);
     setForm({
       id: m.id,
-      client_id: m.client_id,
+      meeting_category: m.meeting_category,
+      client_id: m.client_id ?? "",
       scheduled_at: m.scheduled_at.slice(0, 16),
       reception_type: m.reception_type,
       subject: m.subject,
@@ -158,21 +205,39 @@ export function MeetingsPage() {
     setOpen(true);
   };
 
+  const isValid = Boolean(
+    form.subject &&
+    form.scheduled_at &&
+    (!CATEGORIES[form.meeting_category].needsClient || form.client_id)
+  );
+
+  const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300";
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Agenda</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {meetings ? `${meetings.total} reunião(ões)` : "Carregando..."}
+            {meetings ? `${meetings.total} compromisso(s)` : "Carregando..."}
           </p>
         </div>
         <button
           onClick={() => openNew()}
           className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
         >
-          Nova Reunião
+          Novo Compromisso
         </button>
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-3 mb-4 flex-wrap">
+        {(Object.entries(CATEGORIES) as [MeetingCategory, CategoryConfig][]).map(([key, cfg]) => (
+          <span key={key} className="flex items-center gap-1.5 text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cfg.color }} />
+            {cfg.label}
+          </span>
+        ))}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -193,48 +258,83 @@ export function MeetingsPage() {
         />
       </div>
 
+      {/* Modal */}
       {open && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">{form.id ? "Editar Reunião" : "Nova Reunião"}</h2>
+              <h2 className="text-lg font-bold">{form.id ? "Editar Compromisso" : "Novo Compromisso"}</h2>
               <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-700">
                 <X size={20} />
               </button>
             </div>
 
             <div className="space-y-4">
+              {/* Tipo de compromisso */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cliente *</label>
-                <input
-                  placeholder="Buscar cliente por nome/CPF/CNPJ..."
-                  value={clientSearch}
-                  onChange={(e) => setClientSearch(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de compromisso *</label>
                 <select
-                  value={form.client_id}
-                  onChange={(e) => setForm({ ...form, client_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  value={form.meeting_category}
+                  onChange={(e) => {
+                    const cat = e.target.value as MeetingCategory;
+                    setForm({ ...form, meeting_category: cat, client_id: "" });
+                    setClientSearch("");
+                  }}
+                  className={inputCls}
                 >
-                  <option value="">— selecione —</option>
-                  {clients?.items.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.display_name} ({c.document})
-                    </option>
+                  {(Object.entries(CATEGORIES) as [MeetingCategory, CategoryConfig][]).map(([key, cfg]) => (
+                    <option key={key} value={key}>{cfg.label}</option>
                   ))}
                 </select>
+                {/* Color indicator */}
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <span
+                    className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: catCfg.color }}
+                  />
+                  <span className="text-xs text-gray-400">aparece no calendário com esta cor</span>
+                </div>
               </div>
 
+              {/* Assunto */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Assunto *</label>
                 <input
                   value={form.subject}
                   onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  placeholder="Ex: Assinatura da escritura, Audiência de instrução..."
+                  className={inputCls}
                 />
               </div>
 
+              {/* Cliente — só aparece nos tipos que precisam */}
+              {catCfg.needsClient && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cliente {catCfg.needsClient ? "*" : "(opcional)"}
+                  </label>
+                  <input
+                    placeholder="Buscar por nome, CPF ou CNPJ..."
+                    value={clientSearch}
+                    onChange={(e) => setClientSearch(e.target.value)}
+                    className={`${inputCls} mb-2`}
+                  />
+                  <select
+                    value={form.client_id}
+                    onChange={(e) => setForm({ ...form, client_id: e.target.value })}
+                    className={`${inputCls} bg-white`}
+                  >
+                    <option value="">— selecione —</option>
+                    {clients?.items.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.display_name} ({c.document})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Data/hora e forma de contato */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Data e hora *</label>
@@ -242,43 +342,47 @@ export function MeetingsPage() {
                     type="datetime-local"
                     value={form.scheduled_at}
                     onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    className={inputCls}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Forma de recepção</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Canal</label>
                   <select
                     value={form.reception_type}
                     onChange={(e) => setForm({ ...form, reception_type: e.target.value as ReceptionType })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                    className={`${inputCls} bg-white`}
                   >
                     <option value="presencial">Presencial</option>
-                    <option value="email">E-mail</option>
+                    <option value="videochamada">Videochamada</option>
                     <option value="whatsapp">WhatsApp</option>
+                    <option value="email">E-mail</option>
                   </select>
                 </div>
               </div>
 
+              {/* Status */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value as MeetingStatus })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  className={`${inputCls} bg-white`}
                 >
-                  <option value="agendada">Agendada</option>
-                  <option value="realizada">Realizada</option>
-                  <option value="cancelada">Cancelada</option>
+                  <option value="agendada">Agendado</option>
+                  <option value="realizada">Realizado</option>
+                  <option value="cancelada">Cancelado</option>
                 </select>
               </div>
 
+              {/* Resumo */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Resumo</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
                 <textarea
                   rows={3}
                   value={form.summary}
                   onChange={(e) => setForm({ ...form, summary: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  placeholder="Local, pauta, instruções..."
+                  className={inputCls}
                 />
               </div>
 
@@ -286,10 +390,10 @@ export function MeetingsPage() {
                 <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
               )}
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-2 flex-wrap">
                 <button
                   onClick={() => save.mutate(form)}
-                  disabled={save.isPending || !form.client_id || !form.subject || !form.scheduled_at}
+                  disabled={save.isPending || !isValid}
                   className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 py-2 rounded-lg text-sm"
                 >
                   {save.isPending ? "Salvando..." : "Salvar"}
@@ -314,7 +418,7 @@ export function MeetingsPage() {
                     }`}
                   >
                     {syncGoogle.isPending ? <Loader2 size={14} className="animate-spin" /> : <Calendar size={14} />}
-                    {form.google_event_id ? "Sincronizado ✓" : "Sincronizar"}
+                    {form.google_event_id ? "Sincronizado ✓" : "Google Calendar"}
                   </button>
                 )}
                 <button
@@ -324,6 +428,7 @@ export function MeetingsPage() {
                   Cancelar
                 </button>
               </div>
+
               {syncMsg && (
                 <p className={`text-xs mt-2 ${syncMsg.startsWith("Erro") || syncMsg.startsWith("Sem") ? "text-red-600" : "text-green-600"}`}>
                   {syncMsg}
@@ -334,11 +439,11 @@ export function MeetingsPage() {
         </div>
       )}
 
-      {/* Confirm delete meeting */}
+      {/* Confirm delete */}
       {confirmDelete && form.id && (
         <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center">
           <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
-            <p className="text-base font-semibold text-gray-900 mb-2">Excluir reunião?</p>
+            <p className="text-base font-semibold text-gray-900 mb-2">Excluir compromisso?</p>
             <p className="text-sm text-gray-500 mb-5">Esta ação não pode ser desfeita.</p>
             <div className="flex gap-3 justify-end">
               <button

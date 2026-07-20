@@ -3,12 +3,13 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.models.meeting import MeetingStatus, ReceptionType
+from app.models.meeting import MeetingCategory, MeetingStatus, ReceptionType
 
 
 class MeetingBase(BaseModel):
-    client_id: uuid.UUID
+    client_id: uuid.UUID | None = None
     user_id: uuid.UUID | None = None
+    meeting_category: MeetingCategory = MeetingCategory.reuniao_cliente
     scheduled_at: datetime
     reception_type: ReceptionType = ReceptionType.presencial
     subject: str
@@ -23,6 +24,7 @@ class MeetingCreate(MeetingBase):
 class MeetingUpdate(BaseModel):
     client_id: uuid.UUID | None = None
     user_id: uuid.UUID | None = None
+    meeting_category: MeetingCategory | None = None
     scheduled_at: datetime | None = None
     reception_type: ReceptionType | None = None
     subject: str | None = None
@@ -38,6 +40,7 @@ class MeetingRead(MeetingBase):
     client_name: str | None = None
     user_name: str | None = None
     google_event_id: str | None = None
+    meeting_category_label: str | None = None
 
     model_config = {"from_attributes": True}
 
