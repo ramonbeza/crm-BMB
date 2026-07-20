@@ -43,10 +43,14 @@ class CRUDMeeting(CRUDBase[Meeting]):
             meeting_category=m.meeting_category,
             meeting_category_label=MEETING_CATEGORY_LABELS.get(m.meeting_category),
             scheduled_at=m.scheduled_at,
+            duration_minutes=m.duration_minutes,
             reception_type=m.reception_type,
             subject=m.subject,
             summary=m.summary,
             status=m.status,
+            recurrence_type=m.recurrence_type,
+            recurrence_days=m.recurrence_days,
+            recurrence_end_date=m.recurrence_end_date,
             created_at=m.created_at,
             updated_at=m.updated_at,
             client_name=_client_display(m.client) if m.client else None,
@@ -61,10 +65,14 @@ class CRUDMeeting(CRUDBase[Meeting]):
             user_id=obj_in.user_id,
             meeting_category=obj_in.meeting_category,
             scheduled_at=obj_in.scheduled_at,
+            duration_minutes=obj_in.duration_minutes,
             reception_type=obj_in.reception_type,
             subject=obj_in.subject,
             summary=obj_in.summary,
             status=obj_in.status,
+            recurrence_type=obj_in.recurrence_type,
+            recurrence_days=obj_in.recurrence_days,
+            recurrence_end_date=obj_in.recurrence_end_date,
             created_by_id=created_by_id,
         )
         db.add(m)
@@ -74,7 +82,12 @@ class CRUDMeeting(CRUDBase[Meeting]):
     async def update_meeting(
         self, db: AsyncSession, *, db_obj: Meeting, obj_in: MeetingUpdate
     ) -> MeetingRead:
-        for field in ("client_id", "user_id", "meeting_category", "scheduled_at", "reception_type", "subject", "summary", "status"):
+        updatable = (
+            "client_id", "user_id", "meeting_category", "scheduled_at",
+            "duration_minutes", "reception_type", "subject", "summary", "status",
+            "recurrence_type", "recurrence_days", "recurrence_end_date",
+        )
+        for field in updatable:
             val = getattr(obj_in, field)
             if val is not None:
                 setattr(db_obj, field, val)

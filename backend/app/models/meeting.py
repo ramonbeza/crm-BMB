@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -45,6 +45,15 @@ MEETING_CATEGORY_LABELS: dict[str, str] = {
 }
 
 
+class RecurrenceType(str, Enum):
+    none = "none"
+    daily = "daily"
+    weekly = "weekly"
+    biweekly = "biweekly"
+    monthly = "monthly"
+    yearly = "yearly"
+
+
 class Meeting(Base, UUIDMixin, TimestampMixin):
     """Agenda — reuniões e compromissos do escritório."""
     __tablename__ = "meetings"
@@ -59,10 +68,15 @@ class Meeting(Base, UUIDMixin, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    duration_minutes: Mapped[int] = mapped_column(nullable=False, default=60)
     reception_type: Mapped[str] = mapped_column(String(20), nullable=False, default=ReceptionType.presencial)
     subject: Mapped[str] = mapped_column(String(300), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=MeetingStatus.agendada, index=True)
+    # Recurrence
+    recurrence_type: Mapped[str] = mapped_column(String(20), nullable=False, default=RecurrenceType.none)
+    recurrence_days: Mapped[str | None] = mapped_column(String(20), nullable=True)  # "0,1,2" = Mon,Tue,Wed
+    recurrence_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     google_event_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

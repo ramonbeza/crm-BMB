@@ -93,6 +93,7 @@ export type MeetingCategory =
   | "visita_imovel"
   | "prazo"
   | "outro";
+export type RecurrenceType = "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
 
 export interface Meeting {
   id: string;
@@ -101,10 +102,14 @@ export interface Meeting {
   meeting_category: MeetingCategory;
   meeting_category_label: string | null;
   scheduled_at: string;
+  duration_minutes: number;
   reception_type: ReceptionType;
   subject: string;
   summary: string | null;
   status: MeetingStatus;
+  recurrence_type: RecurrenceType;
+  recurrence_days: string | null;
+  recurrence_end_date: string | null;
   created_at: string;
   updated_at: string;
   client_name: string | null;
