@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = "crm-files"
 
     # First admin (criado no startup se não existir)
-    FIRST_ADMIN_EMAIL: str = "admin@crm.local"
+    FIRST_ADMIN_EMAIL: str = "admin@crm.com.br"
     FIRST_ADMIN_PASSWORD: str = "Admin@123"
     FIRST_ADMIN_NAME: str = "Administrador"
 
