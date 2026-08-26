@@ -7,10 +7,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import router
 from app.core.config import settings
 from app.core.redis_pubsub import start_pubsub_listener
+from app.crud.procedure_type import crud_procedure_type
+from app.db.session import AsyncSessionLocal
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Carrega o catálogo de tipos de procedimento (editável) para o cache em memória deste worker
+    async with AsyncSessionLocal() as session:
+        await crud_procedure_type.sync_label_cache(session)
+
     # Inicia o bridge Redis pub/sub → WebSocket em background
     task = asyncio.create_task(start_pubsub_listener())
     yield

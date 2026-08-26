@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel
 
-from app.models.procedure import ProcedureStatus, ProcedureType, StageStatus
+from app.models.procedure import ProcedureStatus, StageStatus
 
 
 # ── Stage ─────────────────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ class StageUpdate(BaseModel):
 
 class ProcedureBase(BaseModel):
     client_id: uuid.UUID
-    procedure_type: ProcedureType
+    procedure_type: str
     opened_at: date
     description: str | None = None
     property_description: str | None = None
@@ -57,7 +57,7 @@ class ProcedureFromAttendance(ProcedureBase):
 
 
 class ProcedureUpdate(BaseModel):
-    procedure_type: ProcedureType | None = None
+    procedure_type: str | None = None
     opened_at: date | None = None
     description: str | None = None
     property_description: str | None = None

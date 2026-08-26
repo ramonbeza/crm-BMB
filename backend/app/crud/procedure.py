@@ -67,14 +67,15 @@ class CRUDProcedure(CRUDBase[Procedure]):
             notes=s.notes,
         )
 
-    def _to_read(self, p: Procedure) -> ProcedureRead:
+    def _to_read(self, p: Procedure, label_map: dict[str, str] | None = None) -> ProcedureRead:
         from app.schemas.procedure import ChecklistItemRead
+        labels = label_map if label_map is not None else PROCEDURE_TYPE_LABELS
         return ProcedureRead(
             id=p.id,
             protocol_number=p.protocol_number,
             client_id=p.client_id,
             procedure_type=p.procedure_type,
-            procedure_type_label=PROCEDURE_TYPE_LABELS.get(p.procedure_type, p.procedure_type),
+            procedure_type_label=labels.get(p.procedure_type, p.procedure_type),
             opened_at=p.opened_at,
             description=p.description,
             property_description=p.property_description,
@@ -154,7 +155,9 @@ class CRUDProcedure(CRUDBase[Procedure]):
         await seed_checklist(db, p.id, data.procedure_type)
 
         await db.flush()
-        return self._to_read(await self.get_full(db, p.id))
+        from app.crud.procedure_type import crud_procedure_type
+        label_map = await crud_procedure_type.get_label_map(db)
+        return self._to_read(await self.get_full(db, p.id), label_map)
 
     async def create_procedure(
         self, db: AsyncSession, *, obj_in: ProcedureCreate, created_by_id: UUID
@@ -187,7 +190,9 @@ class CRUDProcedure(CRUDBase[Procedure]):
                 setattr(db_obj, field, val)
         db.add(db_obj)
         await db.flush()
-        return self._to_read(await self.get_full(db, db_obj.id))
+        from app.crud.procedure_type import crud_procedure_type
+        label_map = await crud_procedure_type.get_label_map(db)
+        return self._to_read(await self.get_full(db, db_obj.id), label_map)
 
     async def update_stage(
         self, db: AsyncSession, *, stage: ProcedureStage, obj_in: StageUpdate
@@ -256,6 +261,9 @@ class CRUDProcedure(CRUDBase[Procedure]):
         )
         procs = list(res.scalars().unique().all())
 
+        from app.crud.procedure_type import crud_procedure_type
+        label_map = await crud_procedure_type.get_label_map(db)
+
         items = []
         for p in procs:
             done = sum(1 for s in p.stages if s.status == StageStatus.concluida)
@@ -265,7 +273,7 @@ class CRUDProcedure(CRUDBase[Procedure]):
                     protocol_number=p.protocol_number,
                     client_name=_client_display(p.client),
                     procedure_type=p.procedure_type,
-                    procedure_type_label=PROCEDURE_TYPE_LABELS.get(p.procedure_type, p.procedure_type),
+                    procedure_type_label=label_map.get(p.procedure_type, p.procedure_type),
                     status=p.status,
                     opened_at=p.opened_at,
                     deadline=p.deadline,

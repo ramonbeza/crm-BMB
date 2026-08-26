@@ -7,6 +7,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.crud.procedure_type import crud_procedure_type
 from app.models.client import Client, ClientType
 from app.models.procedure import PROCEDURE_TYPE_LABELS
 from app.models.quote import (
@@ -66,7 +67,8 @@ def _custas_list(raw: list | None) -> list[CustaItem]:
     return [CustaItem(name=c["name"], value=float(c["value"])) for c in raw]
 
 
-def _quote_to_read(q: Quote) -> QuoteRead:
+def _quote_to_read(q: Quote, label_map: dict[str, str] | None = None) -> QuoteRead:
+    labels = label_map if label_map is not None else PROCEDURE_TYPE_LABELS
     custas = _custas_list(q.custas_estimadas)
     custas_total = sum(c.value for c in custas)
     subtotal = float(q.honorarios_escritorio or 0) + float(q.honorarios_despachante or 0) + custas_total
@@ -81,7 +83,7 @@ def _quote_to_read(q: Quote) -> QuoteRead:
         client_id=q.client_id,
         client_name=_client_name(q.client),
         procedure_type=q.procedure_type,
-        procedure_type_label=PROCEDURE_TYPE_LABELS.get(q.procedure_type, q.procedure_type) if q.procedure_type else None,
+        procedure_type_label=labels.get(q.procedure_type, q.procedure_type) if q.procedure_type else None,
         status=q.status,
         status_label=QUOTE_STATUS_LABELS.get(q.status, q.status),
         honorarios_escritorio=float(q.honorarios_escritorio or 0),
@@ -160,7 +162,7 @@ async def create_quote(db: AsyncSession, *, obj_in: QuoteCreate, created_by_id: 
     db.add(q)
     await db.commit()
     fetched = await get_quote(db, q.id)
-    return _quote_to_read(fetched)  # type: ignore[arg-type]
+    return _quote_to_read(fetched, await crud_procedure_type.get_label_map(db))  # type: ignore[arg-type]
 
 
 async def get_quote(db: AsyncSession, quote_id: UUID) -> Quote | None:
@@ -187,7 +189,7 @@ async def update_quote(db: AsyncSession, *, db_obj: Quote, obj_in: QuoteUpdate) 
         db_obj.signed_at = datetime.now(timezone.utc)
     await db.commit()
     fetched = await get_quote(db, db_obj.id)
-    return _quote_to_read(fetched)  # type: ignore[arg-type]
+    return _quote_to_read(fetched, await crud_procedure_type.get_label_map(db))  # type: ignore[arg-type]
 
 
 async def new_version(db: AsyncSession, *, original: Quote, created_by_id: UUID) -> QuoteRead:
@@ -213,7 +215,7 @@ async def new_version(db: AsyncSession, *, original: Quote, created_by_id: UUID)
     db.add(new_q)
     await db.commit()
     fetched = await get_quote(db, new_q.id)
-    return _quote_to_read(fetched)  # type: ignore[arg-type]
+    return _quote_to_read(fetched, await crud_procedure_type.get_label_map(db))  # type: ignore[arg-type]
 
 
 async def list_quotes(
@@ -242,6 +244,7 @@ async def list_quotes(
 
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar_one()
     rows = (await db.execute(q.offset((page - 1) * page_size).limit(page_size))).scalars().all()
+    label_map = await crud_procedure_type.get_label_map(db)
 
     items = []
     for row in rows:
@@ -256,7 +259,7 @@ async def list_quotes(
             "client_id": row.client_id,
             "client_name": _client_name(row.client),
             "procedure_id": row.procedure_id,
-            "procedure_type_label": PROCEDURE_TYPE_LABELS.get(row.procedure_type, row.procedure_type) if row.procedure_type else None,
+            "procedure_type_label": label_map.get(row.procedure_type, row.procedure_type) if row.procedure_type else None,
             "status": row.status,
             "status_label": QUOTE_STATUS_LABELS.get(row.status, row.status),
             "total": total_val,
@@ -376,14 +379,14 @@ async def list_contracts(
 # ── Price Table ───────────────────────────────────────────────────────────────
 
 async def get_price_table(db: AsyncSession) -> list[PriceTableRead]:
-    from app.models.procedure import PROCEDURE_TYPE_LABELS
+    label_map = await crud_procedure_type.get_label_map(db)
     res = await db.execute(select(PriceTableEntry).order_by(PriceTableEntry.procedure_type))
     entries = res.scalars().all()
     return [
         PriceTableRead(
             id=e.id,
             procedure_type=e.procedure_type,
-            procedure_type_label=PROCEDURE_TYPE_LABELS.get(e.procedure_type, e.procedure_type),
+            procedure_type_label=label_map.get(e.procedure_type, e.procedure_type),
             base_honorarios=float(e.base_honorarios or 0),
             base_despachante=float(e.base_despachante or 0),
             custas_tipicas=_custas_list(e.custas_tipicas),
@@ -396,7 +399,6 @@ async def get_price_table(db: AsyncSession) -> list[PriceTableRead]:
 async def upsert_price_entry(
     db: AsyncSession, procedure_type: str, obj_in: PriceTableUpdate
 ) -> PriceTableRead:
-    from app.models.procedure import PROCEDURE_TYPE_LABELS
     res = await db.execute(select(PriceTableEntry).where(PriceTableEntry.procedure_type == procedure_type))
     entry = res.scalar_one_or_none()
     if entry is None:
@@ -416,7 +418,7 @@ async def upsert_price_entry(
     return PriceTableRead(
         id=entry.id,
         procedure_type=entry.procedure_type,
-        procedure_type_label=PROCEDURE_TYPE_LABELS.get(entry.procedure_type, entry.procedure_type),
+        procedure_type_label=(await crud_procedure_type.get_label_map(db)).get(entry.procedure_type, entry.procedure_type),
         base_honorarios=float(entry.base_honorarios or 0),
         base_despachante=float(entry.base_despachante or 0),
         custas_tipicas=_custas_list(entry.custas_tipicas),

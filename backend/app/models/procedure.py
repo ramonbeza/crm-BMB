@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from enum import Enum
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -60,6 +60,16 @@ PROCEDURE_TYPE_LABELS: dict[str, str] = {
     "inventario_extrajudicial": "Inventário Extrajudicial",
     "divorcio": "Divórcio",
 }
+
+
+class ProcedureTypeCatalog(Base, UUIDMixin, TimestampMixin):
+    """Catálogo de tipos de procedimento — editável por admin/advogado na tela de Procedimentos."""
+    __tablename__ = "procedure_types"
+
+    code: Mapped[str] = mapped_column(String(60), unique=True, nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(200), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class ProcedureStatus(str, Enum):

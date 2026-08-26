@@ -19,7 +19,8 @@ from app.core.deps import CurrentUser, InternalOnly, get_session
 from app.models.client import Client, ClientType
 from app.models.financial import FinancialEntry
 from app.models.meeting import Meeting
-from app.models.procedure import PROCEDURE_TYPE_LABELS, Procedure, ProcedureStage
+from app.crud.procedure_type import crud_procedure_type
+from app.models.procedure import Procedure, ProcedureStage
 from app.models.quote import Contract, Quote
 
 router = APIRouter()
@@ -68,6 +69,7 @@ async def dashboard_kpis(
     today = now.date()
     first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     seven_days = today + timedelta(days=7)
+    label_map = await crud_procedure_type.get_label_map(db)
 
     # ── Clientes ──────────────────────────────────────────────────────────────
     total_clientes = await _scalar(
@@ -104,7 +106,7 @@ async def dashboard_kpis(
     proc_por_tipo = [
         {
             "tipo": row[0],
-            "label": PROCEDURE_TYPE_LABELS.get(row[0], row[0]),
+            "label": label_map.get(row[0], row[0]),
             "total": row[1],
         }
         for row in proc_por_tipo_rows
@@ -254,7 +256,7 @@ async def dashboard_kpis(
             {
                 "id": str(p.id),
                 "numero": _proc_number(p),
-                "tipo_label": PROCEDURE_TYPE_LABELS.get(p.procedure_type, p.procedure_type),
+                "tipo_label": label_map.get(p.procedure_type, p.procedure_type),
                 "status": p.status,
                 "client_name": _client_name(p.client),
                 "updated_at": p.updated_at.isoformat(),
@@ -280,6 +282,7 @@ async def report_procedures(
         q = q.where(Procedure.procedure_type == procedure_type)
 
     rows = (await db.execute(q)).scalars().all()
+    label_map = await crud_procedure_type.get_label_map(db)
 
     tipo_stats: dict[str, dict] = {}
     for p in rows:
@@ -287,7 +290,7 @@ async def report_procedures(
         if t not in tipo_stats:
             tipo_stats[t] = {
                 "tipo": t,
-                "label": PROCEDURE_TYPE_LABELS.get(t, t),
+                "label": label_map.get(t, t),
                 "total": 0,
                 "ativos": 0,
                 "concluidos": 0,
@@ -309,7 +312,7 @@ async def report_procedures(
                 "id": str(p.id),
                 "numero": _proc_number(p),
                 "tipo": p.procedure_type,
-                "tipo_label": PROCEDURE_TYPE_LABELS.get(p.procedure_type, p.procedure_type),
+                "tipo_label": label_map.get(p.procedure_type, p.procedure_type),
                 "status": p.status,
                 "client_name": _client_name(p.client),
                 "responsible_name": p.responsible.name if p.responsible else None,
@@ -545,6 +548,7 @@ async def export_procedures_xlsx(
             .order_by(Procedure.opened_at.desc())
         )
     ).scalars().all()
+    label_map = await crud_procedure_type.get_label_map(db)
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -565,7 +569,7 @@ async def export_procedures_xlsx(
     status_map = {"em_andamento": "Em andamento", "concluido": "Concluído", "cancelado": "Cancelado"}
     for row_idx, p in enumerate(rows, 2):
         ws.cell(row=row_idx, column=1, value=_proc_number(p))
-        ws.cell(row=row_idx, column=2, value=PROCEDURE_TYPE_LABELS.get(p.procedure_type, p.procedure_type))
+        ws.cell(row=row_idx, column=2, value=label_map.get(p.procedure_type, p.procedure_type))
         ws.cell(row=row_idx, column=3, value=status_map.get(p.status, p.status))
         ws.cell(row=row_idx, column=4, value=_client_name(p.client) or "")
         ws.cell(row=row_idx, column=5, value=p.responsible.name if p.responsible else "")

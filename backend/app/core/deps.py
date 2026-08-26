@@ -67,6 +67,7 @@ async def _internal_only(current_user: CurrentUser) -> User:
 
 
 AdminOnly = Annotated[User, Depends(require_roles(UserRole.admin))]
+AdminOrAdvogado = Annotated[User, Depends(require_roles(UserRole.admin, UserRole.advogado))]
 InternalOnly = Annotated[User, Depends(_internal_only)]
 
 

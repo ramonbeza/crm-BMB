@@ -183,7 +183,8 @@ async def generate_document(
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> AIDocRead:
     """Cria um registro AIDocument e dispara a task Celery de geração."""
-    from app.models.procedure import PROCEDURE_TYPE_LABELS
+    from app.crud.procedure_type import crud_procedure_type
+    label_map = await crud_procedure_type.get_label_map(db)
 
     # Carrega o procedimento com client e responsible
     proc = (
@@ -282,7 +283,7 @@ async def generate_document(
         "client_document": _client_doc(proc.client),
         "client_address": _client_address(proc.client),
         "procedure_type": proc.procedure_type,
-        "procedure_type_label": PROCEDURE_TYPE_LABELS.get(proc.procedure_type, proc.procedure_type),
+        "procedure_type_label": label_map.get(proc.procedure_type, proc.procedure_type),
         "procedure_number": _proc_number(proc),
         "property_description": proc.property_description or "",
         "matricula": proc.matricula or "",
@@ -439,7 +440,7 @@ async def suggest_workflow(
 
     import json, re
     import anthropic
-    from app.models.procedure import PROCEDURE_TYPE_LABELS
+    from app.crud.procedure_type import crud_procedure_type
     from app.models.property import Property
 
     # Carrega procedimento completo
@@ -474,7 +475,7 @@ async def suggest_workflow(
     )).scalars().all()
 
     # Constrói contexto textual
-    proc_label = PROCEDURE_TYPE_LABELS.get(proc.procedure_type, proc.procedure_type)
+    proc_label = (await crud_procedure_type.get_label_map(db)).get(proc.procedure_type, proc.procedure_type)
     stages_text = "\n".join(
         f"  - {s.name}: {s.status}" for s in (proc.stages or [])
     )

@@ -23,7 +23,8 @@ from app.crud.property import (
     update_checklist_item,
     update_property,
 )
-from app.models.procedure import PROCEDURE_TYPE_LABELS, Procedure, ProcedureStatus
+from app.crud.procedure_type import crud_procedure_type
+from app.models.procedure import Procedure, ProcedureStatus
 from app.models.property import PROPERTY_TYPE_LABELS, ChecklistItem, Property
 from app.schemas.property import (
     ChecklistItemRead,
@@ -685,6 +686,7 @@ async def download_property_pdf(
         .order_by(Procedure.created_at.desc())
     )
     procs = result.scalars().all()
+    label_map = await crud_procedure_type.get_label_map(db)
 
     status_labels = {
         ProcedureStatus.em_andamento: "Em andamento",
@@ -694,7 +696,7 @@ async def download_property_pdf(
     proc_dicts = [
         {
             "protocol": p.protocol,
-            "type_label": PROCEDURE_TYPE_LABELS.get(p.procedure_type, p.procedure_type),
+            "type_label": label_map.get(p.procedure_type, p.procedure_type),
             "status_label": status_labels.get(p.status, str(p.status)),
         }
         for p in procs

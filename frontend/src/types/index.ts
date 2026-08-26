@@ -158,6 +158,15 @@ export interface ProcedureTypeOption {
   label: string;
 }
 
+export interface ProcedureTypeCatalogItem {
+  id: string;
+  code: string;
+  label: string;
+  is_active: boolean;
+  sort_order: number;
+  in_use: boolean;
+}
+
 export interface Stage {
   id: string;
   procedure_id: string;

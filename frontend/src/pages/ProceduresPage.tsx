@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { Settings, X } from "lucide-react";
 import { api } from "@/lib/api";
 import type {
   PaginatedProcedures,
@@ -12,6 +12,7 @@ import type {
   User,
 } from "@/types";
 import { formatDate } from "@/lib/utils";
+import { ProcedureTypesManagerModal } from "@/components/ProcedureTypesManager";
 
 const statusLabel: Record<ProcedureStatus, string> = {
   em_andamento: "Em andamento",
@@ -53,6 +54,7 @@ const emptyForm = (): FormState => ({
 export function ProceduresPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [typesManagerOpen, setTypesManagerOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [clientSearch, setClientSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -173,6 +175,14 @@ export function ProceduresPage() {
             Limpar filtros
           </button>
         )}
+        <button
+          onClick={() => setTypesManagerOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 ml-auto"
+          title="Cadastrar ou editar tipos de procedimento"
+        >
+          <Settings size={14} />
+          Gerenciar tipos
+        </button>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -259,7 +269,16 @@ export function ProceduresPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de procedimento *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Tipo de procedimento *</label>
+                  <button
+                    type="button"
+                    onClick={() => setTypesManagerOpen(true)}
+                    className="text-xs text-primary-600 hover:underline"
+                  >
+                    + Novo tipo
+                  </button>
+                </div>
                 <select
                   value={form.procedure_type}
                   onChange={(e) => setForm({ ...form, procedure_type: e.target.value })}
@@ -391,6 +410,10 @@ export function ProceduresPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {typesManagerOpen && (
+        <ProcedureTypesManagerModal onClose={() => setTypesManagerOpen(false)} />
       )}
     </div>
   );

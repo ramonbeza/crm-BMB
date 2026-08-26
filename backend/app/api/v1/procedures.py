@@ -16,7 +16,8 @@ from app.core.audit import audit
 from app.core.deps import CurrentUser, InternalOnly, get_session, is_despachante
 from app.crud.attendance import crud_attendance
 from app.crud.procedure import crud_procedure
-from app.models.procedure import PROCEDURE_TYPE_LABELS, Procedure, ProcedureStatus
+from app.crud.procedure_type import crud_procedure_type
+from app.models.procedure import Procedure, ProcedureStatus
 from app.models.user import UserRole
 from app.schemas.procedure import (
     AttachmentRead,
@@ -42,8 +43,12 @@ router = APIRouter()
 
 
 @router.get("/types", response_model=list[ProcedureTypeOption])
-async def list_procedure_types(_: CurrentUser):
-    return [ProcedureTypeOption(value=k, label=v) for k, v in PROCEDURE_TYPE_LABELS.items()]
+async def list_procedure_types(
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_session)],
+):
+    rows = await crud_procedure_type.list_all(db, active_only=True)
+    return [ProcedureTypeOption(value=r.code, label=r.label) for r in rows]
 
 
 @router.get("", response_model=PaginatedProcedures)
@@ -79,6 +84,8 @@ async def create_procedure(
     current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
+    if not await crud_procedure_type.get_by_code(db, body.procedure_type):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de procedimento inválido")
     result = await crud_procedure.create_procedure(db, obj_in=body, created_by_id=current_user.id)
     await audit(db, request, current_user, "procedure.created",
                 entity_type="procedure", entity_id=str(result.id),
@@ -92,6 +99,8 @@ async def create_procedure_from_attendance(
     current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
+    if not await crud_procedure_type.get_by_code(db, body.procedure_type):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de procedimento inválido")
     attendance = await crud_attendance.get_full(db, body.attendance_id)
     if not attendance:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Atendimento não encontrado")
@@ -133,6 +142,7 @@ async def _minha_area_impl(current_user, db):
         stmt = stmt.where(Procedure.responsible_user_id == current_user.id)
 
     procs = (await db.execute(stmt)).scalars().all()
+    label_map = await crud_procedure_type.get_label_map(db)
 
     items: list[WorkspaceItem] = []
     for p in procs:
@@ -157,7 +167,7 @@ async def _minha_area_impl(current_user, db):
             protocol_number=p.protocol_number,
             client_name=client_name,
             procedure_type=p.procedure_type,
-            procedure_type_label=PROCEDURE_TYPE_LABELS.get(p.procedure_type, p.procedure_type),
+            procedure_type_label=label_map.get(p.procedure_type, p.procedure_type),
             status=p.status,
             opened_at=p.opened_at,
             deadline=p.deadline,
@@ -202,6 +212,8 @@ async def update_procedure(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Despachante-externo não pode editar dados do procedimento. Use a rota de etapas.",
         )
+    if body.procedure_type is not None and not await crud_procedure_type.get_by_code(db, body.procedure_type):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de procedimento inválido")
     # Valida que executor_user_id pertence a um despachante-externo
     if body.executor_user_id is not None:
         import sqlalchemy as sa

@@ -18,7 +18,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.deps import CurrentUser, get_session, is_despachante
 from app.models.client import Client, ClientPF, ClientPJ
-from app.models.procedure import PROCEDURE_TYPE_LABELS, Procedure
+from app.crud.procedure_type import crud_procedure_type
+from app.models.procedure import Procedure
 from app.models.property import Property
 
 router = APIRouter()
@@ -189,13 +190,14 @@ async def global_search(
         stmt_proc = stmt_proc.where(Procedure.executor_user_id == current_user.id)
 
     procs = (await db.execute(stmt_proc)).scalars().all()
+    proc_label_map = await crud_procedure_type.get_label_map(db)
     for p in procs:
         procedures_out.append(ProcedureResult(
             id=p.id,
             protocol_number=p.protocol_number,
             protocol_label=_protocol_label(p),
             procedure_type=p.procedure_type,
-            procedure_type_label=PROCEDURE_TYPE_LABELS.get(p.procedure_type, p.procedure_type),
+            procedure_type_label=proc_label_map.get(p.procedure_type, p.procedure_type),
             client_name=_client_name(p),
             status=p.status,
         ))

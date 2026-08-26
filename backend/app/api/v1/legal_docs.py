@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.deps import CurrentUser, get_session
 from app.models.legal_document import LEGAL_DOC_SCOPE_LABELS, LEGAL_DOC_TYPE_LABELS, LegalDocument
-from app.models.procedure import PROCEDURE_TYPE_LABELS
+from app.crud.procedure_type import crud_procedure_type
 
 router = APIRouter()
 
@@ -207,7 +207,7 @@ async def consult_legal_docs_stream(
     if not docs:
         raise HTTPException(status_code=404, detail="Nenhum documento encontrado.")
 
-    proc_label = PROCEDURE_TYPE_LABELS.get(body.procedure_type, body.procedure_type)
+    proc_label = (await crud_procedure_type.get_label_map(db)).get(body.procedure_type, body.procedure_type)
     municipio_info = f"Município: {body.municipio}" if body.municipio else ""
     context = f"Contexto adicional: {body.additional_context}" if body.additional_context else ""
 
@@ -280,5 +280,6 @@ async def consult_legal_docs_stream(
 
 
 @router.get("/procedure-types")
-async def list_procedure_types(_: CurrentUser):
-    return [{"value": k, "label": v} for k, v in PROCEDURE_TYPE_LABELS.items()]
+async def list_procedure_types(_: CurrentUser, db: Annotated[AsyncSession, Depends(get_session)]):
+    rows = await crud_procedure_type.list_all(db, active_only=True)
+    return [{"value": r.code, "label": r.label} for r in rows]
