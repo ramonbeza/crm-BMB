@@ -140,7 +140,11 @@ class CRUDProcedure(CRUDBase[Procedure]):
         db.add(p)
         await db.flush()
 
-        for idx, stage_name in enumerate(STANDARD_STAGES, start=1):
+        from app.crud.procedure_type import crud_procedure_type
+        type_row = await crud_procedure_type.get_by_code(db, data.procedure_type)
+        stage_names = type_row.stage_template if type_row and type_row.stage_template else STANDARD_STAGES
+
+        for idx, stage_name in enumerate(stage_names, start=1):
             db.add(
                 ProcedureStage(
                     procedure_id=p.id,

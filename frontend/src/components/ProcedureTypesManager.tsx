@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check, ListOrdered } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ProcedureTypeCatalogItem } from "@/types";
+import { StageTemplateModal } from "@/components/StageTemplateModal";
 
 function extractError(err: unknown, fallback: string): string {
   const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -20,6 +21,7 @@ export function ProcedureTypesManagerModal({ onClose }: { onClose: () => void })
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [stagesFor, setStagesFor] = useState<ProcedureTypeCatalogItem | null>(null);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["procedure-types-admin"] });
@@ -159,6 +161,13 @@ export function ProcedureTypesManagerModal({ onClose }: { onClose: () => void })
                         Ativo
                       </label>
                       <button
+                        onClick={() => setStagesFor(t)}
+                        className="text-gray-400 hover:text-primary-600 hover:bg-primary-50 p-1.5 rounded"
+                        title="Editar etapas do procedimento"
+                      >
+                        <ListOrdered size={14} />
+                      </button>
+                      <button
                         onClick={() => startEdit(t)}
                         className="text-gray-400 hover:text-primary-600 hover:bg-primary-50 p-1.5 rounded"
                         title="Renomear"
@@ -184,6 +193,10 @@ export function ProcedureTypesManagerModal({ onClose }: { onClose: () => void })
           )}
         </div>
       </div>
+
+      {stagesFor && (
+        <StageTemplateModal type={stagesFor} onClose={() => setStagesFor(null)} />
+      )}
     </div>
   );
 }

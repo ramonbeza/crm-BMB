@@ -70,6 +70,9 @@ class ProcedureTypeCatalog(Base, UUIDMixin, TimestampMixin):
     label: Mapped[str] = mapped_column(String(200), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    stage_template: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=lambda: list(STANDARD_STAGES)
+    )
 
 
 class ProcedureStatus(str, Enum):

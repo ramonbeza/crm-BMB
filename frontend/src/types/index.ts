@@ -164,6 +164,7 @@ export interface ProcedureTypeCatalogItem {
   label: string;
   is_active: boolean;
   sort_order: number;
+  stage_template: string[];
   in_use: boolean;
 }
 
