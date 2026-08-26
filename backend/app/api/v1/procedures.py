@@ -16,7 +16,7 @@ from app.core.audit import audit
 from app.core.deps import CurrentUser, InternalOnly, get_session, is_despachante
 from app.crud.attendance import crud_attendance
 from app.crud.procedure import crud_procedure
-from app.models.procedure import PROCEDURE_TYPE_LABELS
+from app.models.procedure import PROCEDURE_TYPE_LABELS, Procedure, ProcedureStatus
 from app.models.user import UserRole
 from app.schemas.procedure import (
     AttachmentRead,
@@ -116,7 +116,7 @@ async def minha_area(
 
 
 async def _minha_area_impl(current_user, db):
-    from app.models.procedure import ProcedureTask, ProcedureStatus
+    from app.models.procedure import ProcedureTask
     from app.models.user import UserRole
 
     stmt = (
