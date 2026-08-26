@@ -3,7 +3,7 @@ import { useAuthStore } from "@/store/authStore";
 
 // No Railway, VITE_API_URL = "https://backend.up.railway.app/api/v1"
 // Em dev local, fallback para relativo (proxy Vite / nginx)
-const API_BASE = import.meta.env.VITE_API_URL ?? "/api/v1";
+const API_BASE = import.meta.env.VITE_API_URL || "/api/v1";
 
 export const api = axios.create({
   baseURL: API_BASE,

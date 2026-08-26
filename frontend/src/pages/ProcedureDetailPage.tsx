@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, Receipt, User, Briefcase, DollarSign, X, Sparkles, ExternalLink, Copy, Check } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown, ChevronUp, FileText, Plus, Receipt, User, Briefcase, DollarSign, X, Sparkles, ExternalLink, Copy, Check, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, ChecklistStatus, ProcedureFinancialSummary, FinancialEntryListItem, PaginatedFinancialEntries, EntryTipo, EntryCategory, User as UserType } from "@/types";
 import { formatDate } from "@/lib/utils";
@@ -354,6 +354,14 @@ export function ProcedureDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["procedure", id] }),
   });
 
+  const deleteProcedure = useMutation({
+    mutationFn: async () => api.delete(`/procedures/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["procedures"] });
+      navigate("/procedimentos");
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -450,6 +458,26 @@ export function ProcedureDetailPage() {
                   {statusLabel[s]}
                 </button>
               ))}
+              {(currentUser?.role === "admin" || currentUser?.role === "advogado") && (
+                <>
+                  <div className="h-4 w-px bg-gray-200" />
+                  <button
+                    onClick={() => {
+                      const ok = window.confirm(
+                        `Excluir o procedimento ${protocolFormatted}?\n\nEsta ação é irreversível e remove todas as etapas, checklist, notas, tarefas e anexos associados.`
+                      );
+                      if (!ok) return;
+                      deleteProcedure.mutate();
+                    }}
+                    disabled={deleteProcedure.isPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-40"
+                    title="Excluir procedimento"
+                  >
+                    <Trash2 size={13} />
+                    Excluir
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
