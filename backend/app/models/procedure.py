@@ -78,6 +78,22 @@ class ProcedureStatus(str, Enum):
     cancelado = "cancelado"
 
 
+class WorkspaceStage(str, Enum):
+    """Coluna do quadro kanban em 'Minha Área' — independente do status do procedimento."""
+    novo = "novo"
+    em_andamento = "em_andamento"
+    aguardando = "aguardando"
+    concluido = "concluido"
+
+
+WORKSPACE_STAGE_LABELS: dict[str, str] = {
+    "novo": "Novo",
+    "em_andamento": "Em andamento",
+    "aguardando": "Aguardando",
+    "concluido": "Concluído",
+}
+
+
 class StageStatus(str, Enum):
     pendente = "pendente"
     em_andamento = "em_andamento"
@@ -117,6 +133,9 @@ class Procedure(Base, UUIDMixin, TimestampMixin):
     tags: Mapped[list | None] = mapped_column(JSONB, nullable=True, default=list)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default=ProcedureStatus.em_andamento, index=True
+    )
+    workspace_stage: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=WorkspaceStage.novo, index=True
     )
     responsible_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

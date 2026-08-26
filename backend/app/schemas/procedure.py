@@ -68,6 +68,7 @@ class ProcedureUpdate(BaseModel):
     deadline: date | None = None
     tags: list[str] | None = None
     status: ProcedureStatus | None = None
+    workspace_stage: str | None = None
     responsible_user_id: uuid.UUID | None = None
     executor_user_id: uuid.UUID | None = None
     property_id: uuid.UUID | None = None
@@ -233,11 +234,15 @@ class WorkspaceItem(BaseModel):
     procedure_type: str
     procedure_type_label: str
     status: ProcedureStatus
+    workspace_stage: str
     opened_at: date
     deadline: date | None
     tags: list[str]
     stages_done: int
     stages_total: int
     pending_tasks: int
+    responsible_user_id: uuid.UUID | None
+    responsible_name: str | None
+    updated_at: datetime
 
     model_config = {"from_attributes": True}

@@ -525,6 +525,8 @@ export interface FinancialDashboard {
 
 // ── Workspace features (Sprint 21+) ──────────────────────────────────────────
 
+export type WorkspaceStage = "novo" | "em_andamento" | "aguardando" | "concluido";
+
 export interface WorkspaceItem {
   id: string;
   protocol_number: number;
@@ -532,12 +534,16 @@ export interface WorkspaceItem {
   procedure_type: string;
   procedure_type_label: string;
   status: ProcedureStatus;
+  workspace_stage: WorkspaceStage;
   opened_at: string;
   deadline: string | null;
   tags: string[];
   stages_done: number;
   stages_total: number;
   pending_tasks: number;
+  responsible_user_id: string | null;
+  responsible_name: string | null;
+  updated_at: string;
 }
 
 export interface ProcedureTransfer {

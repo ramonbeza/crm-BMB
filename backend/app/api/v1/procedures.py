@@ -17,7 +17,7 @@ from app.core.deps import CurrentUser, InternalOnly, get_session, is_despachante
 from app.crud.attendance import crud_attendance
 from app.crud.procedure import crud_procedure
 from app.crud.procedure_type import crud_procedure_type
-from app.models.procedure import Procedure, ProcedureStatus
+from app.models.procedure import WORKSPACE_STAGE_LABELS, Procedure, ProcedureStatus
 from app.models.user import UserRole
 from app.schemas.procedure import (
     AttachmentRead,
@@ -115,16 +115,18 @@ async def create_procedure_from_attendance(
 async def minha_area(
     current_user: InternalOnly,
     db: Annotated[AsyncSession, Depends(get_session)],
+    only_mine: bool = Query(False),
 ):
-    """Procedimentos em andamento do usuário logado (admin vê todos)."""
+    """Procedimentos em andamento do usuário logado. Admin vê todos por padrão,
+    mas pode restringir aos seus com only_mine=true; demais perfis sempre veem só os seus."""
     try:
-        return await _minha_area_impl(current_user, db)
+        return await _minha_area_impl(current_user, db, only_mine=only_mine)
     except Exception:
         logger.exception("Erro no endpoint /minha-area")
         raise
 
 
-async def _minha_area_impl(current_user, db):
+async def _minha_area_impl(current_user, db, *, only_mine: bool = False):
     from app.models.procedure import ProcedureTask
     from app.models.user import UserRole
 
@@ -134,11 +136,12 @@ async def _minha_area_impl(current_user, db):
             selectinload(Procedure.client).selectinload(Client.pf_data),
             selectinload(Procedure.client).selectinload(Client.pj_data),
             selectinload(Procedure.stages),
+            selectinload(Procedure.responsible),
         )
         .where(Procedure.status == ProcedureStatus.em_andamento)
-        .order_by(Procedure.opened_at.desc())
+        .order_by(Procedure.updated_at.desc())
     )
-    if current_user.role != UserRole.admin:
+    if current_user.role != UserRole.admin or only_mine:
         stmt = stmt.where(Procedure.responsible_user_id == current_user.id)
 
     procs = (await db.execute(stmt)).scalars().all()
@@ -169,12 +172,16 @@ async def _minha_area_impl(current_user, db):
             procedure_type=p.procedure_type,
             procedure_type_label=label_map.get(p.procedure_type, p.procedure_type),
             status=p.status,
+            workspace_stage=p.workspace_stage,
             opened_at=p.opened_at,
             deadline=p.deadline,
             tags=p.tags or [],
             stages_done=stages_done,
             stages_total=stages_total,
             pending_tasks=task_count or 0,
+            responsible_user_id=p.responsible_user_id,
+            responsible_name=p.responsible.name if p.responsible else None,
+            updated_at=p.updated_at,
         ))
 
     return items
@@ -214,6 +221,8 @@ async def update_procedure(
         )
     if body.procedure_type is not None and not await crud_procedure_type.get_by_code(db, body.procedure_type):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de procedimento inválido")
+    if body.workspace_stage is not None and body.workspace_stage not in WORKSPACE_STAGE_LABELS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Etapa de fluxo inválida")
     # Valida que executor_user_id pertence a um despachante-externo
     if body.executor_user_id is not None:
         import sqlalchemy as sa

@@ -183,7 +183,8 @@ class CRUDProcedure(CRUDBase[Procedure]):
         for field in (
             "procedure_type", "opened_at", "description", "property_description",
             "matricula", "incra", "inscricao_imobiliaria", "requerente",
-            "deadline", "tags", "status", "responsible_user_id", "executor_user_id", "property_id",
+            "deadline", "tags", "status", "workspace_stage",
+            "responsible_user_id", "executor_user_id", "property_id",
         ):
             val = getattr(obj_in, field)
             if val is not None:
