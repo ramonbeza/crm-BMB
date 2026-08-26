@@ -8,6 +8,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
 
+# Importado explicitamente para garantir que o mapper do SQLAlchemy consiga
+# resolver relationship("User") nos modelos abaixo, independente da ordem de import.
+from app.models.user import User  # noqa: F401
+
 
 class ProcedureType(str, Enum):
     # ── Despachante imobiliário ────────────────────────────────────────────────

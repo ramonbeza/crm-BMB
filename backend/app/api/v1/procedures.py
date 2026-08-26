@@ -1,6 +1,9 @@
+import logging
 from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
@@ -105,6 +108,14 @@ async def minha_area(
     db: Annotated[AsyncSession, Depends(get_session)],
 ):
     """Procedimentos em andamento do usuário logado (admin vê todos)."""
+    try:
+        return await _minha_area_impl(current_user, db)
+    except Exception:
+        logger.exception("Erro no endpoint /minha-area")
+        raise
+
+
+async def _minha_area_impl(current_user, db):
     from app.models.procedure import ProcedureTask, ProcedureStatus
     from app.models.user import UserRole
 
