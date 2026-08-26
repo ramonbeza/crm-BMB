@@ -268,6 +268,7 @@ alembic history --verbose
 | **Sprint 16** | ✅ | `cfb5769` | Busca global: GET /search — clientes, procedimentos, imóveis + GlobalSearch no header |
 | **Sprint 17** | ✅ | `6616546` | D4Sign: assinatura digital de orçamentos/contratos + webhook HMAC + D4SignPanel |
 | **Sprint 18** | ✅ | `e078060` | Geração de PDF: fpdf2, GET /quotes/{id}/pdf + /contratos/{id}/pdf, botão Baixar |
+| **Melhorias pós-Sprint 18** | ✅ | `c387437` | Sidebar scrollável, 8 categorias de agenda com cores, agenda recorrente (rrule), ClientDetailPage, filtro de tipo em ProceduresPage, checklist templates para 8 novos tipos de procedimento |
 
 ---
 
@@ -359,6 +360,34 @@ Arquitetura planejada:
 - **Claude API** (`claude-opus-4-7` ou `claude-sonnet-4-6`) gera documentos automaticamente
 - Documentos gerados: requerimentos, contratos, declarações, notificações extrajudiciais
 - Armazenados no MinIO, referenciados no procedimento
+
+---
+
+## Estado Atual do Deploy (atualizado em 2026-08-26)
+
+### Produção — Railway
+- **URL do sistema:** `https://robust-emotion-production-e1df.up.railway.app`
+- **Backend (crm-BMB):** `https://crm-bmb-production.up.railway.app` (FastAPI, porta 8080)
+- **Banco:** PostgreSQL Railway — `hayabusa.proxy.rlwy.net:54943` (público) / `postgres.railway.internal:5432` (interno)
+- **Redis:** `redis.railway.internal:6379` (interno)
+- **Projeto Railway:** `magnificent-energy` / ambiente `production`
+- **Login admin:** `admin@bezamiranda.com.br` / `BezaMiranda@2024`
+
+### Bugs corrigidos recentemente
+- **Migration 018** (`018_legal_documents.py`): tinha `index=True` na coluna `doc_type` dentro de `create_table` E `op.create_index` explícito abaixo → índice duplicado → crash no PostgreSQL → corrigido removendo `index=True` da definição da coluna
+- **`config.py`**: `FIRST_ADMIN_EMAIL` era `admin@crm.local` — domínio `.local` rejeitado pelo Pydantic v2 (`email-validator`) → corrigido para `admin@crm.com.br` (o Railway usa a variável de ambiente `FIRST_ADMIN_EMAIL=admin@bezamiranda.com.br` que sobrescreve)
+
+### Migração para VPS em andamento (2026-08-26)
+- **Objetivo:** mover de Railway para VPS Hetzner CX22 (Ubuntu 24.04) para acesso centralizado por todos os usuários
+- **Backup do banco gerado:** `crm_backup.dump` (119KB, formato `pg_dump -Fc`, restore com `pg_restore`)
+- **Próximos passos:** contratar VPS Hetzner → apontar DNS `crm.bezamiranda.com.br` → deploy com `docker-compose.prod.yml` → restaurar backup → cutover
+
+### Fluxo de deploy após VPS
+```bash
+# No VPS, para aplicar qualquer alteração de código:
+make deploy   # git pull + docker build + alembic upgrade head + restart
+```
+Alterações feitas pelo Claude (Mac ou Windows) vão para o GitHub → `make deploy` no VPS propaga para todos os usuários.
 
 ---
 
