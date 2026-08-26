@@ -513,3 +513,73 @@ export interface FinancialDashboard {
   vencimentos_proximos: FinancialEntryListItem[];
   em_atraso: FinancialEntryListItem[];
 }
+
+// ── Workspace features (Sprint 21+) ──────────────────────────────────────────
+
+export interface WorkspaceItem {
+  id: string;
+  protocol_number: number;
+  client_name: string | null;
+  procedure_type: string;
+  procedure_type_label: string;
+  status: ProcedureStatus;
+  opened_at: string;
+  deadline: string | null;
+  tags: string[];
+  stages_done: number;
+  stages_total: number;
+  pending_tasks: number;
+}
+
+export interface ProcedureTransfer {
+  id: string;
+  procedure_id: string;
+  from_user_id: string | null;
+  from_user_name: string | null;
+  to_user_id: string;
+  to_user_name: string | null;
+  transferred_by_id: string | null;
+  transferred_by_name: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ProcedureComment {
+  id: string;
+  procedure_id: string;
+  author_id: string | null;
+  author_name: string | null;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TaskStatus = "pendente" | "em_andamento" | "concluida";
+
+export interface ProcedureTask {
+  id: string;
+  procedure_id: string;
+  title: string;
+  description: string | null;
+  assigned_to_id: string | null;
+  assigned_to_name: string | null;
+  created_by_id: string | null;
+  created_by_name: string | null;
+  due_date: string | null;
+  status: TaskStatus;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProcedureAttachment {
+  id: string;
+  procedure_id: string;
+  uploaded_by_id: string | null;
+  uploaded_by_name: string | null;
+  filename: string;
+  content_type: string | null;
+  file_size: number | null;
+  created_at: string;
+}
+

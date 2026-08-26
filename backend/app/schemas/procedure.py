@@ -132,3 +132,112 @@ class PaginatedProcedures(BaseModel):
 class ProcedureTypeOption(BaseModel):
     value: str
     label: str
+
+
+# ── Transfer ──────────────────────────────────────────────────────────────────
+
+class TransferCreate(BaseModel):
+    to_user_id: uuid.UUID
+    notes: str | None = None
+
+
+class TransferRead(BaseModel):
+    id: uuid.UUID
+    procedure_id: uuid.UUID
+    from_user_id: uuid.UUID | None
+    from_user_name: str | None = None
+    to_user_id: uuid.UUID
+    to_user_name: str | None = None
+    transferred_by_id: uuid.UUID | None
+    transferred_by_name: str | None = None
+    notes: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Comment ───────────────────────────────────────────────────────────────────
+
+class CommentCreate(BaseModel):
+    content: str
+
+
+class CommentRead(BaseModel):
+    id: uuid.UUID
+    procedure_id: uuid.UUID
+    author_id: uuid.UUID | None
+    author_name: str | None = None
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Task ──────────────────────────────────────────────────────────────────────
+
+class TaskCreate(BaseModel):
+    title: str
+    description: str | None = None
+    assigned_to_id: uuid.UUID | None = None
+    due_date: date | None = None
+
+
+class TaskUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    assigned_to_id: uuid.UUID | None = None
+    due_date: date | None = None
+    status: str | None = None
+
+
+class TaskRead(BaseModel):
+    id: uuid.UUID
+    procedure_id: uuid.UUID
+    title: str
+    description: str | None
+    assigned_to_id: uuid.UUID | None
+    assigned_to_name: str | None = None
+    created_by_id: uuid.UUID | None
+    created_by_name: str | None = None
+    due_date: date | None
+    status: str
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Attachment ────────────────────────────────────────────────────────────────
+
+class AttachmentRead(BaseModel):
+    id: uuid.UUID
+    procedure_id: uuid.UUID
+    uploaded_by_id: uuid.UUID | None
+    uploaded_by_name: str | None = None
+    filename: str
+    content_type: str | None
+    file_size: int | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Workspace ─────────────────────────────────────────────────────────────────
+
+class WorkspaceItem(BaseModel):
+    id: uuid.UUID
+    protocol_number: int
+    client_name: str | None
+    procedure_type: str
+    procedure_type_label: str
+    status: ProcedureStatus
+    opened_at: date
+    deadline: date | None
+    tags: list[str]
+    stages_done: int
+    stages_total: int
+    pending_tasks: int
+
+    model_config = {"from_attributes": True}

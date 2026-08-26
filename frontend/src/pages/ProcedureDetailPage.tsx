@@ -7,6 +7,7 @@ import type { Procedure, Stage, StageStatus, ProcedureStatus, ChecklistItem, Che
 import { formatDate } from "@/lib/utils";
 import { AIDocumentPanel } from "@/components/AIDocumentPanel";
 import { ExtractedDocumentsPanel } from "@/components/ExtractedDocumentsPanel";
+import { ProcedureCollabPanel } from "@/components/ProcedureCollabPanel";
 import { WorkflowAssistantPanel } from "@/components/WorkflowAssistantPanel";
 import { useAuthStore } from "@/store/authStore";
 
@@ -335,6 +336,12 @@ export function ProcedureDetailPage() {
     enabled: isInternal,
   });
 
+  const { data: allUsers = [] } = useQuery<UserType[]>({
+    queryKey: ["users-all"],
+    queryFn: async () => (await api.get<UserType[]>("/users")).data,
+    enabled: isInternal,
+  });
+
   const updateStatus = useMutation({
     mutationFn: async (newStatus: ProcedureStatus) =>
       (await api.put(`/procedures/${id}`, { status: newStatus })).data,
@@ -544,6 +551,20 @@ export function ProcedureDetailPage() {
         </div>
         <ExtractedDocumentsPanel procedureId={p.id} />
       </div>
+
+      {/* Colaboração: notas, tarefas, transferências, anexos */}
+      {isInternal && (
+        <div className="mt-5">
+          <ProcedureCollabPanel
+            procedureId={p.id}
+            users={allUsers}
+            canTransfer={
+              currentUser?.role === "admin" ||
+              p.responsible_user_id === currentUser?.id
+            }
+          />
+        </div>
+      )}
 
       {/* Assistente de fluxo + Geração de documentos */}
       <ProcedureAISection procedureId={p.id} procedureType={p.procedure_type} />

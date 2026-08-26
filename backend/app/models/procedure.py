@@ -161,3 +161,86 @@ class ProcedureStage(Base, UUIDMixin, TimestampMixin):
 
     procedure: Mapped["Procedure"] = relationship("Procedure", back_populates="stages")
     assigned_user = relationship("User", foreign_keys=[assigned_user_id])
+
+
+class ProcedureTransfer(Base, UUIDMixin, TimestampMixin):
+    """Histórico de transferências de responsável."""
+    __tablename__ = "procedure_transfers"
+
+    procedure_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    from_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    to_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=False
+    )
+    transferred_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    procedure = relationship("Procedure", foreign_keys=[procedure_id])
+    from_user = relationship("User", foreign_keys=[from_user_id])
+    to_user = relationship("User", foreign_keys=[to_user_id])
+    transferred_by = relationship("User", foreign_keys=[transferred_by_id])
+
+
+class ProcedureComment(Base, UUIDMixin, TimestampMixin):
+    """Notas internas de equipe em um procedimento."""
+    __tablename__ = "procedure_comments"
+
+    procedure_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    author_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+
+    procedure = relationship("Procedure", foreign_keys=[procedure_id])
+    author = relationship("User", foreign_keys=[author_id])
+
+
+class ProcedureTask(Base, UUIDMixin, TimestampMixin):
+    """Tarefas internas dentro de um procedimento."""
+    __tablename__ = "procedure_tasks"
+
+    procedure_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pendente", index=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    procedure = relationship("Procedure", foreign_keys=[procedure_id])
+    assigned_to = relationship("User", foreign_keys=[assigned_to_id])
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+
+class ProcedureAttachment(Base, UUIDMixin, TimestampMixin):
+    """Arquivos anexados a um procedimento (armazenados no MinIO)."""
+    __tablename__ = "procedure_attachments"
+
+    procedure_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    uploaded_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    filename: Mapped[str] = mapped_column(String(500), nullable=False)
+    content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    storage_key: Mapped[str] = mapped_column(String(1000), nullable=False)
+
+    procedure = relationship("Procedure", foreign_keys=[procedure_id])
+    uploaded_by = relationship("User", foreign_keys=[uploaded_by_id])

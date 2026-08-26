@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Users, LayoutDashboard, LogOut, UserCircle2, Calendar, ClipboardList, FolderOpen, Building2, Receipt, FileCheck, Wallet, MessageSquare, BarChart2, Clock, Plug, Scale, UserCog } from "lucide-react";
+import { Users, LayoutDashboard, LogOut, UserCircle2, Calendar, ClipboardList, FolderOpen, Building2, Receipt, FileCheck, Wallet, MessageSquare, BarChart2, Clock, Plug, Scale, UserCog, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
@@ -16,6 +16,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/minha-area", label: "Minha Área", icon: Briefcase, allowedRoles: ["admin", "advogado", "estagiario"] },
   { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/agenda", label: "Agenda", icon: Calendar, allowedRoles: ["admin", "advogado", "estagiario"] },
   { to: "/atendimentos", label: "Atendimentos", icon: ClipboardList, allowedRoles: ["admin", "advogado", "estagiario"] },
